@@ -3,3 +3,7 @@ DerivedData/
 build/
 .DS_Store
 *.xcuserstate
+
+# Reference screenshots of other apps: kept locally, never published
+gauntlet/bar/
+gauntlet/bar_hw/
