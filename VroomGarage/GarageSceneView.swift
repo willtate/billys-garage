@@ -14,7 +14,7 @@ struct GarageSceneView: UIViewRepresentable {
         view.antialiasingMode = .multisampling4X
         view.preferredFramesPerSecond = 60
         view.rendersContinuously = true
-        view.backgroundColor = GarageScene.horizon
+        view.backgroundColor = GarageScene.backdrop
         view.isMultipleTouchEnabled = true
 
         let c = context.coordinator

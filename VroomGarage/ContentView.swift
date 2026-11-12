@@ -43,9 +43,9 @@ struct PartTray: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 18) {
+            HStack(spacing: 12) {
                 ForEach(PartCategory.allCases) { cat in
-                    CategoryButton(category: cat, selected: garage.category == cat) {
+                    CategoryButton(category: cat, icon: garage.categoryIcon(cat), selected: garage.category == cat) {
                         garage.pick(cat)
                     }
                 }
@@ -66,9 +66,15 @@ struct PartTray: View {
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 36, style: .continuous)
-                    .fill(Color.white.opacity(0.96))
-                    .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
+                ZStack(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(LinearGradient(colors: [Color(white: 0.22), Color(white: 0.13)], startPoint: .top, endPoint: .bottom))
+                    HazardStripe()
+                        .frame(height: 12)
+                        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous).inset(by: 0).offset(y: 0))
+                        .mask(RoundedRectangle(cornerRadius: 30, style: .continuous).padding(.bottom, -18))
+                }
+                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
             )
             .padding(.horizontal, 18)
             .padding(.bottom, 14)
@@ -76,36 +82,72 @@ struct PartTray: View {
     }
 
     @ViewBuilder private var options: some View {
-        let tint = Color(garage.category.tint)
-        switch garage.category {
-        case .body:
-            ForEach(Catalog.bodies) { b in
-                PartCard(image: garage.thumbnail(body: b.id), placeholder: "car.fill", tint: tint,
-                         selected: garage.design.body == b.id) {
-                    garage.update { $0.body = b.id }
-                }
-            }
-        case .wheels:
-            ForEach(Catalog.wheels) { w in
-                PartCard(image: garage.thumbnail(wheel: w.id), placeholder: "circle.circle.fill", tint: tint,
-                         selected: garage.design.wheels == w.id) {
-                    garage.update { $0.wheels = w.id }
-                }
-            }
+        let cat = garage.category
+        let tint = Color(cat.tint)
+        switch cat {
         case .paint:
             ForEach(Catalog.paints) { p in
                 PaintCard(paint: p, selected: garage.design.paint == p.id) {
                     garage.update { $0.paint = p.id }
                 }
             }
-        case .topper:
-            ForEach(Catalog.toppers) { t in
-                PartCard(image: t.build == nil ? nil : garage.thumbnail(topper: t.id),
-                         placeholder: t.build == nil ? "nosign" : "sparkles", tint: tint,
-                         selected: garage.design.topper == t.id) {
-                    garage.update { $0.topper = t.id }
+        default:
+            ForEach(choices(cat), id: \.self) { id in
+                PartCard(image: id == "none" ? nil : garage.thumbnail(cat, id),
+                         placeholder: id == "none" ? "nosign" : cat.symbol, tint: tint,
+                         selected: current(cat) == id) {
+                    garage.update { d in
+                        switch cat {
+                        case .body: d.body = id
+                        case .wheels: d.wheels = id
+                        case .sticker: d.sticker = id
+                        default: if let slot = cat.slot { d.setAddon(slot, id) }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private func choices(_ cat: PartCategory) -> [String] {
+        switch cat {
+        case .body: return Catalog.bodies.map(\.id)
+        case .wheels: return Catalog.wheels.map(\.id)
+        case .paint: return Catalog.paints.map(\.id)
+        case .sticker: return Catalog.stickers.map(\.id)
+        default: return Catalog.addons(cat.slot!).map(\.id)
+        }
+    }
+
+    private func current(_ cat: PartCategory) -> String {
+        let d = garage.design
+        switch cat {
+        case .body: return d.body
+        case .wheels: return d.wheels
+        case .paint: return d.paint
+        case .sticker: return d.sticker
+        default: return d.addon(cat.slot!)
+        }
+    }
+}
+
+struct HazardStripe: View {
+    var body: some View {
+        GeometryReader { geo in
+            Path { p in
+                let h = geo.size.height
+                var x: CGFloat = -h
+                while x < geo.size.width + h {
+                    p.move(to: CGPoint(x: x, y: h))
+                    p.addLine(to: CGPoint(x: x + h, y: 0))
+                    p.addLine(to: CGPoint(x: x + h * 2, y: 0))
+                    p.addLine(to: CGPoint(x: x + h, y: h))
+                    p.closeSubpath()
+                    x += h * 2.4
+                }
+            }
+            .fill(Color.black)
+            .background(Color(red: 1, green: 0.8, blue: 0))
         }
     }
 }
@@ -145,6 +187,7 @@ struct BigRoundButton<Label: View>: View {
 
 struct CategoryButton: View {
     let category: PartCategory
+    let icon: UIImage?
     let selected: Bool
     let action: () -> Void
 
@@ -155,13 +198,17 @@ struct CategoryButton: View {
                 Circle()
                     .fill(LinearGradient(colors: [.white.opacity(0.4), .clear], startPoint: .top, endPoint: .center))
                     .padding(5)
-                Image(systemName: category.symbol)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(.white)
+                if let icon = icon {
+                    Image(uiImage: icon).resizable().scaledToFit().padding(6)
+                } else {
+                    Image(systemName: category.symbol)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundColor(.white)
+                }
             }
-            .frame(width: 86, height: 86)
-            .overlay(Circle().stroke(Color.white, lineWidth: selected ? 7 : 0))
-            .shadow(color: .black.opacity(selected ? 0.3 : 0.15), radius: selected ? 10 : 5, y: 5)
+            .frame(width: 80, height: 80)
+            .overlay(Circle().stroke(Color.white, lineWidth: selected ? 6 : 0))
+            .shadow(color: .black.opacity(selected ? 0.35 : 0.2), radius: selected ? 10 : 5, y: 5)
             .scaleEffect(selected ? 1.12 : 0.92)
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: selected)
         }
@@ -179,8 +226,10 @@ struct PartCard: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(tint.opacity(selected ? 0.38 : 0.2))
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(white: selected ? 0.36 : 0.27))
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(RadialGradient(colors: [tint.opacity(selected ? 0.45 : 0.18), .clear], center: .center, startRadius: 10, endRadius: 110))
                 if let image = image {
                     Image(uiImage: image)
                         .resizable()
@@ -189,12 +238,12 @@ struct PartCard: View {
                 } else {
                     Image(systemName: placeholder)
                         .font(.system(size: 52, weight: .bold))
-                        .foregroundColor(tint.opacity(0.7))
+                        .foregroundColor(Color(white: 0.6))
                 }
             }
             .frame(width: 172, height: 150)
             .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .stroke(selected ? tint : Color.clear, lineWidth: 7)
             )
             .scaleEffect(selected ? 1.05 : 1)

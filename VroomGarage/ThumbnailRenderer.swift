@@ -13,13 +13,13 @@ final class ThumbnailRenderer {
         renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
         renderer.scene = scene
         scene.background.contents = UIColor.clear
-        scene.lightingEnvironment.contents = verticalGradient(GarageScene.skyTop, GarageScene.horizon)
+        scene.lightingEnvironment.contents = studioEnvironment
         scene.lightingEnvironment.intensity = 1.4
 
-        let key = SCNLight(); key.type = .directional; key.intensity = 1200
+        let key = SCNLight(); key.type = .directional; key.intensity = 1100
         let keyNode = SCNNode(); keyNode.light = key; keyNode.eulerAngles = V(-0.9, 0.6, 0)
         scene.rootNode.addChildNode(keyNode)
-        let amb = SCNLight(); amb.type = .ambient; amb.intensity = 350
+        let amb = SCNLight(); amb.type = .ambient; amb.intensity = 380
         let ambNode = SCNNode(); ambNode.light = amb
         scene.rootNode.addChildNode(ambNode)
 
@@ -30,24 +30,25 @@ final class ThumbnailRenderer {
         renderer.pointOfView = camera
     }
 
-    func car(_ design: CarDesign, size: CGFloat) -> UIImage {
+    /// The whole car, seen from `direction` (car space: +X front, +Z left side).
+    func car(_ design: CarDesign, size: CGFloat, direction: SCNVector3 = V(0.78, 0.42, 0.95)) -> UIImage {
         materials.setPaint(Catalog.paint(design.paint), animated: false)
         let built = CarBuilder.build(design, materials: materials)
-        return shoot(built.root, size: size, direction: V(0.78, 0.42, 0.95))
+        return shoot(built.root, size: size, direction: direction)
     }
 
     func wheel(_ id: String, paint: String, size: CGFloat) -> UIImage {
         materials.setPaint(Catalog.paint(paint), animated: false)
         let node = Catalog.wheel(id).build(materials, 0.42, 0.36)
         orient(node, .z)
-        let holder = group(nil, [node])
-        return shoot(holder, size: size, direction: V(0.45, 0.25, 1.0))
+        return shoot(group(nil, [node]), size: size, direction: V(0.45, 0.25, 1.0))
     }
 
-    func topper(_ id: String, paint: String, size: CGFloat) -> UIImage? {
-        guard let make = Catalog.topper(id).build else { return nil }
+    /// One add-on part on its own (for the category buttons).
+    func addon(_ slot: AddonSlot, _ id: String, paint: String, size: CGFloat) -> UIImage? {
+        guard let make = Catalog.addon(slot, id).build else { return nil }
         materials.setPaint(Catalog.paint(paint), animated: false)
-        let node = make(materials)
+        let node = make(materials, Catalog.muscle)
         return shoot(group(nil, [node]), size: size, direction: V(0.9, 0.55, 0.85))
     }
 

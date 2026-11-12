@@ -19,65 +19,83 @@ final class GarageScene {
     private let maxDistance: Float = 16
     var cameraDistance: Float = 10 { didSet { cameraNode.position.z = cameraDistance } }
 
-    static let skyTop = UIColor(red: 0.45, green: 0.78, blue: 1.0, alpha: 1)
-    static let horizon = UIColor(red: 0.86, green: 0.94, blue: 1.0, alpha: 1)
+    static let backdrop = UIColor(white: 0.12, alpha: 1)
 
     init() {
-        let sky = verticalGradient(Self.skyTop, Self.horizon)
-        scene.background.contents = sky
-        scene.lightingEnvironment.contents = sky
-        scene.lightingEnvironment.intensity = 1.3
-        scene.fogColor = Self.horizon
-        scene.fogStartDistance = 30
-        scene.fogEndDistance = 80
+        scene.background.contents = Self.backdrop
+        scene.lightingEnvironment.contents = studioEnvironment
+        scene.lightingEnvironment.intensity = 1.25
 
-        // Ground
+        // Polished concrete floor
         let floor = SCNFloor()
-        floor.reflectivity = 0.04
-        floor.materials = [.pbr(UIColor(red: 0.52, green: 0.84, blue: 0.42, alpha: 1), rough: 0.9)]
+        floor.reflectivity = 0.12
+        floor.reflectionFalloffEnd = 3
+        let concrete = Workshop.textured(concreteImage, repeatX: 14, repeatY: 14, rough: 0.5)
+        concrete.diffuse.contentsTransform = SCNMatrix4MakeScale(0.12, 0.12, 1)
+        concrete.diffuse.intensity = 0.9
+        floor.materials = [concrete]
         let floorNode = SCNNode(geometry: floor)
-        floorNode.position.y = -0.25
+        floorNode.position.y = Workshop.floorY
         scene.rootNode.addChildNode(floorNode)
 
-        // Turntable
-        let deck = SCNMaterial.pbr(UIColor(white: 0.97, alpha: 1), rough: 0.4, clearCoat: true)
-        let rim = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.78, blue: 0.1, alpha: 1), rough: 0.3, clearCoat: true)
-        let table = cylNode(deck, r: 3.6, h: 0.3, at: V(0, -0.15, 0))
-        let ring = torusNode(rim, ring: 3.6, pipe: 0.12, at: V(0, -0.02, 0))
-        userSpin.addChildNode(table)
-        userSpin.addChildNode(ring)
-        for i in 0..<12 {
-            let a = Float(i) / 12 * 2 * .pi
-            let dot = cylNode(rim, r: 0.09, h: 0.02, at: V(cos(a) * 3.2, 0.005, sin(a) * 3.2))
-            userSpin.addChildNode(dot)
+        // Turntable: diamond-plate deck with a glowing ring
+        let deck = Workshop.textured(diamondPlateImage, repeatX: 9, repeatY: 9, rough: 0.35)
+        deck.metalness.contents = 0.8
+        let edge = SCNMaterial.pbr(UIColor(white: 0.2, alpha: 1), metal: 0.9, rough: 0.3)
+        let led = SCNMaterial.pbr(UIColor(red: 0.6, green: 0.9, blue: 1.0, alpha: 1), rough: 0.2,
+                                  emission: UIColor(red: 0.35, green: 0.8, blue: 1.0, alpha: 1))
+        let table = SCNCylinder(radius: 3.6, height: 0.25)
+        table.radialSegmentCount = 72
+        table.materials = [edge, deck, edge]
+        let tableNode = SCNNode(geometry: table)
+        tableNode.position = V(0, -0.125, 0)
+        userSpin.addChildNode(tableNode)
+        userSpin.addChildNode(torusNode(led, ring: 3.6, pipe: 0.04, at: V(0, -0.02, 0)))
+        userSpin.addChildNode(torusNode(edge, ring: 3.62, pipe: 0.06, at: V(0, -0.15, 0)))
+        for i in 0..<16 {
+            let a = Float(i) / 16 * 2 * .pi
+            userSpin.addChildNode(cylNode(led, r: 0.05, h: 0.01, at: V(cos(a) * 3.3, 0.002, sin(a) * 3.3)))
         }
 
         scene.rootNode.addChildNode(autoSpin)
         autoSpin.addChildNode(userSpin)
         userSpin.addChildNode(carHolder)
-        userSpin.eulerAngles.y = -0.6
+        userSpin.eulerAngles.y = -0.7
 
-        // Lights
-        let sun = SCNLight()
-        sun.type = .directional
-        sun.intensity = 1100
-        sun.color = UIColor(red: 1.0, green: 0.97, blue: 0.92, alpha: 1)
-        sun.castsShadow = true
-        sun.shadowMapSize = CGSize(width: 2048, height: 2048)
-        sun.shadowSampleCount = 16
-        sun.shadowRadius = 6
-        sun.shadowColor = UIColor(white: 0, alpha: 0.5)
-        sun.orthographicScale = 7
-        sun.shadowMode = .forward
-        let sunNode = SCNNode()
-        sunNode.light = sun
-        sunNode.eulerAngles = V(-1.05, 0.45, 0)
-        scene.rootNode.addChildNode(sunNode)
+        // Lights: a key light from the roof with soft shadows, two cooler rim lights and warm fill.
+        let key = SCNLight()
+        key.type = .directional
+        key.intensity = 1150
+        key.color = UIColor(red: 1.0, green: 0.97, blue: 0.92, alpha: 1)
+        key.castsShadow = true
+        key.shadowMapSize = CGSize(width: 2048, height: 2048)
+        key.shadowSampleCount = 16
+        key.shadowRadius = 8
+        key.shadowColor = UIColor(white: 0, alpha: 0.55)
+        key.orthographicScale = 8
+        key.shadowMode = .forward
+        let keyNode = SCNNode()
+        keyNode.light = key
+        keyNode.eulerAngles = V(-1.2, 0.35, 0)
+        scene.rootNode.addChildNode(keyNode)
+
+        for (x, z) in [(Float(-7), Float(-4)), (Float(7), Float(-5))] {
+            let rim = SCNLight()
+            rim.type = .omni
+            rim.intensity = 420
+            rim.color = UIColor(red: 0.8, green: 0.9, blue: 1.0, alpha: 1)
+            rim.attenuationStartDistance = 4
+            rim.attenuationEndDistance = 18
+            let n = SCNNode()
+            n.light = rim
+            n.position = V(x, 5, z)
+            scene.rootNode.addChildNode(n)
+        }
 
         let fill = SCNLight()
         fill.type = .ambient
-        fill.intensity = 280
-        fill.color = UIColor(red: 0.85, green: 0.92, blue: 1.0, alpha: 1)
+        fill.intensity = 300
+        fill.color = UIColor(red: 1.0, green: 0.95, blue: 0.88, alpha: 1)
         let fillNode = SCNNode()
         fillNode.light = fill
         scene.rootNode.addChildNode(fillNode)
@@ -100,7 +118,7 @@ final class GarageScene {
         cameraRig.eulerAngles.x = -0.2
         scene.rootNode.addChildNode(cameraRig)
 
-        scene.rootNode.addChildNode(Scenery.make())
+        scene.rootNode.addChildNode(Workshop.make())
         startAutoSpin()
     }
 
@@ -118,20 +136,28 @@ final class GarageScene {
             let built = swapCar(design)
             dropIn(built.body, height: 2.6)
             built.wheelMounts.enumerated().forEach { popIn($0.element, delay: 0.25 + Double($0.offset) * 0.06) }
-            if let t = built.topper { popIn(t, delay: 0.5) }
             SoundFX.shared.play(.clunk)
         } else if prev.wheels != design.wheels {
             let built = swapCar(design)
             built.wheelMounts.enumerated().forEach { popIn($0.element, delay: Double($0.offset) * 0.08) }
             hop(delay: 0.3)
             SoundFX.shared.play(.boing)
-        } else if prev.topper != design.topper {
+        } else if let slot = AddonSlot.allCases.first(where: { prev.addon($0) != design.addon($0) }) {
             let built = swapCar(design)
-            if let t = built.topper { popIn(t, delay: 0) }
+            if let n = built.addons[slot] { popIn(n, delay: 0) }
             hop(delay: 0.15)
             Driver.cheer(built.driver)
-            SoundFX.shared.play(.pop)
+            SoundFX.shared.play(design.addon(slot) == "none" ? .click : .clunk)
+        } else if prev.sticker != design.sticker {
+            let built = swapCar(design)
+            if let s = built.sticker { popIn(s, delay: 0) }
+            wiggle()
+            Driver.cheer(built.driver)
+            sparkleBurst(color: .white)
+            SoundFX.shared.play(.sparkle)
         } else if prev.paint != design.paint {
+            // Stickers pick their ink colour from the paint, so rebuild them.
+            swapCar(design)
             wiggle()
             if let d = car?.driver { Driver.cheer(d) }
             sparkleBurst(color: Catalog.paint(design.paint).color)
@@ -351,7 +377,7 @@ final class GarageScene {
         sizeAnim.values = [0.4, 1.6]
         ps.propertyControllers = [.size: SCNParticlePropertyController(animation: sizeAnim)]
         let n = SCNNode()
-        let worldPos = carHolder.convertPosition(V(-1.9, 0.5, 0), to: scene.rootNode)
+        let worldPos = carHolder.convertPosition(car?.tailpipe ?? V(-1.9, 0.5, 0), to: scene.rootNode)
         ps.emittingDirection = carHolder.convertVector(V(-1, 0.3, 0), to: scene.rootNode)
         n.position = worldPos
         n.addParticleSystem(ps)
@@ -363,8 +389,8 @@ final class GarageScene {
 
     private func startAutoSpin() {
         // Gently sway around a three-quarter front view so the driver and headlights face the kid.
-        let left = SCNAction.rotateTo(x: 0, y: 0.45, z: 0, duration: 4.5, usesShortestUnitArc: true)
-        let right = SCNAction.rotateTo(x: 0, y: -0.45, z: 0, duration: 4.5, usesShortestUnitArc: true)
+        let left = SCNAction.rotateTo(x: 0, y: 0.22, z: 0, duration: 4.5, usesShortestUnitArc: true)
+        let right = SCNAction.rotateTo(x: 0, y: -0.28, z: 0, duration: 4.5, usesShortestUnitArc: true)
         left.timingMode = .easeInEaseOut
         right.timingMode = .easeInEaseOut
         let sway = SCNAction.sequence([left, right])
