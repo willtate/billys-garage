@@ -440,12 +440,12 @@ function frame(obj: THREE.Object3D, aspect: number, fov = 26, spread = 1.75) {
   return cam;
 }
 
-function carThumb(d: Design, turn: number, spread = 1.75): string {
+function carThumb(d: Design, turn: number, spread = 1.75, w = 280, h = 200): string {
   const body = bodies.find((b) => b.id === d.body) ?? bodies[0];
   const wheel = wheels.find((w) => w.id === d.wheels) ?? wheels[0];
   const c = buildCar(d, body, wheel, materials);
   c.root.rotation.y = turn;
-  return snapshot(c.root, frame(c.root, 1.4, 26, spread), 280, 200);
+  return snapshot(c.root, frame(c.root, w / h, 26, spread), w, h);
 }
 
 function addonThumb(slot: typeof slots[number], id: string): string {
@@ -458,6 +458,16 @@ function addonThumb(slot: typeof slots[number], id: string): string {
 autoUpdate(() => (touching ? performance.now() : lastTouch));
 renderWheelThumbs();
 renderTabs();
+// `?icon` draws just the app icon (a red muscle car on yellow), for making the home-screen icon.
+if (q.has('icon')) {
+  thumbScene.background = new THREE.Color(0xffc21a);
+  materials.setPaint(paints[0], false);
+  const img = new Image();
+  img.src = carThumb({ ...design, body: 'muscle', paint: 'red', wheels: 'alloy', sticker: 'stripes', engine: 'blower', front: 'none', roof: 'none', back: 'none' }, -0.55, 1.95, 1024, 1024);
+  document.body.innerHTML = '';
+  img.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh';
+  document.body.append(img);
+}
 // `?go=<ms>` starts a lap automatically (for checking the drive without touching the screen).
 if (q.has('go')) setTimeout(vroom, Number(q.get('go')) || 500);
 renderCards();

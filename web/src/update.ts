@@ -7,6 +7,8 @@ declare const __BUILD_ID__: string;
  */
 export function autoUpdate(lastTouch: () => number) {
   if (import.meta.env.DEV) return;
+  // Offline support (see public/sw.js).
+  navigator.serviceWorker?.register('/sw.js').catch(() => {});
   let pending = false;
   const check = async () => {
     try {
