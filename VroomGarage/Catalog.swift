@@ -38,7 +38,13 @@ enum PartCategory: String, CaseIterable, Identifiable {
 final class CarMaterials {
     let paint = SCNMaterial.pbr(.red, metal: 0.15, rough: 0.32, clearCoat: true)
     let trim = SCNMaterial.pbr(UIColor(white: 0.16, alpha: 1), rough: 0.55)
-    let glass = SCNMaterial.pbr(UIColor(red: 0.62, green: 0.86, blue: 1.0, alpha: 1), metal: 0.2, rough: 0.05, clearCoat: true)
+    let glass: SCNMaterial = {
+        let g = SCNMaterial.pbr(UIColor(red: 0.62, green: 0.86, blue: 1.0, alpha: 1), metal: 0.1, rough: 0.05)
+        g.transparency = 0.38
+        g.blendMode = .alpha
+        g.writesToDepthBuffer = false
+        return g
+    }()
     let chrome = SCNMaterial.pbr(UIColor(white: 0.95, alpha: 1), metal: 1.0, rough: 0.14)
     let rubber = SCNMaterial.pbr(UIColor(white: 0.10, alpha: 1), rough: 0.8)
     let white = SCNMaterial.pbr(UIColor(white: 0.97, alpha: 1), rough: 0.35)
@@ -70,6 +76,9 @@ struct BodyStyle: Identifiable {
     let wheelWidth: Float
     let roof: SCNVector3
     let rear: SCNVector3
+    /// Where the driver sits (bottom of the torso) and how big they are.
+    let seat: SCNVector3
+    let driverScale: Float
     let build: (CarMaterials) -> SCNNode
 }
 
@@ -100,7 +109,7 @@ enum Catalog {
 
     static let bodies: [BodyStyle] = [
         BodyStyle(id: "racer", wheelRadius: 0.42, wheelbase: 2.4, track: 1.75, wheelWidth: 0.36,
-                  roof: V(-0.15, 1.08, 0), rear: V(-1.55, 0.70, 0)) { m in
+                  roof: V(-0.15, 1.08, 0), rear: V(-1.55, 0.70, 0), seat: V(-0.2, 0.4, 0), driverScale: 0.75) { m in
             group("body", [
                 boxNode(m.paint, 3.5, 0.40, 1.30, r: 0.18, at: V(0, 0.50, 0)),
                 boxNode(m.paint, 1.55, 0.30, 1.72, r: 0.14, at: V(-0.12, 0.46, 0)),
@@ -119,7 +128,7 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "monster", wheelRadius: 0.75, wheelbase: 2.3, track: 2.0, wheelWidth: 0.55,
-                  roof: V(-0.25, 2.13, 0), rear: V(-1.45, 1.53, 0)) { m in
+                  roof: V(-0.25, 2.16, 0), rear: V(-1.45, 1.53, 0), seat: V(-0.2, 1.3, 0), driverScale: 0.8) { m in
             group("body", [
                 boxNode(m.trim, 2.8, 0.22, 1.0, r: 0.05, at: V(0, 0.80, 0)),
                 cylNode(m.trim, r: 0.08, h: 2.0, axis: .z, at: V(1.15, 0.75, 0)),
@@ -129,9 +138,6 @@ enum Catalog {
                 cylNode(m.chrome, r: 0.07, h: 0.55, at: V(-1.0, 1.0, 0.55)),
                 cylNode(m.chrome, r: 0.07, h: 0.55, at: V(-1.0, 1.0, -0.55)),
                 boxNode(m.paint, 3.1, 0.55, 1.5, r: 0.16, at: V(0, 1.25, 0)),
-                boxNode(m.paint, 1.45, 0.62, 1.42, r: 0.2, at: V(-0.25, 1.82, 0)),
-                boxNode(m.glass, 1.15, 0.36, 1.44, r: 0.1, at: V(-0.25, 1.86, 0)),
-                boxNode(m.glass, 0.06, 0.36, 1.2, r: 0.02, at: V(0.48, 1.86, 0)),
                 boxNode(m.chrome, 0.05, 0.24, 0.75, r: 0.02, at: V(1.56, 1.2, 0)),
                 sphereNode(m.headlight, r: 0.12, at: V(1.52, 1.34, 0.52)),
                 sphereNode(m.headlight, r: 0.12, at: V(1.52, 1.34, -0.52)),
@@ -139,10 +145,10 @@ enum Catalog {
                 boxNode(m.taillight, 0.05, 0.14, 0.3, r: 0.02, at: V(-1.56, 1.34, -0.5)),
                 boxNode(m.chrome, 0.16, 0.16, 1.62, r: 0.06, at: V(1.62, 0.98, 0)),
                 boxNode(m.chrome, 0.16, 0.16, 1.62, r: 0.06, at: V(-1.62, 0.98, 0)),
-            ])
+            ] + cabin(m, x: -0.25, bottom: 1.52, length: 1.45, height: 0.52, width: 1.42))
         },
         BodyStyle(id: "jeep", wheelRadius: 0.5, wheelbase: 2.1, track: 1.75, wheelWidth: 0.42,
-                  roof: V(-0.75, 2.1, 0), rear: V(-1.3, 1.26, 0)) { m in
+                  roof: V(-0.75, 2.1, 0), rear: V(-1.3, 1.26, 0), seat: V(-0.12, 1.15, 0.34), driverScale: 1.0) { m in
             group("body", [
                 boxNode(m.paint, 2.7, 0.62, 1.45, r: 0.14, at: V(0, 0.95, 0)),
                 boxNode(m.paint, 0.95, 0.2, 1.35, r: 0.08, at: V(0.85, 1.32, 0)),
@@ -165,11 +171,9 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "bus", wheelRadius: 0.46, wheelbase: 3.0, track: 1.65, wheelWidth: 0.38,
-                  roof: V(0.3, 2.05, 0), rear: V(-1.85, 2.05, 0)) { m in
+                  roof: V(0.3, 2.06, 0), rear: V(-1.85, 2.06, 0), seat: V(1.55, 1.0, 0.4), driverScale: 1.0) { m in
             group("body", [
-                boxNode(m.paint, 4.4, 1.45, 1.7, r: 0.28, at: V(0, 1.33, 0)),
-                boxNode(m.glass, 3.4, 0.52, 1.72, r: 0.12, at: V(-0.35, 1.62, 0)),
-                boxNode(m.glass, 0.06, 0.68, 1.42, r: 0.05, at: V(2.19, 1.6, 0)),
+                boxNode(m.paint, 4.4, 0.85, 1.7, r: 0.2, at: V(0, 1.0, 0)),
                 boxNode(m.white, 4.42, 0.12, 1.72, r: 0.04, at: V(0, 1.12, 0)),
                 boxNode(m.trim, 0.16, 0.2, 1.62, r: 0.06, at: V(2.22, 0.72, 0)),
                 boxNode(m.trim, 0.16, 0.2, 1.62, r: 0.06, at: V(-2.22, 0.72, 0)),
@@ -177,12 +181,11 @@ enum Catalog {
                 sphereNode(m.headlight, r: 0.12, at: V(2.17, 0.95, -0.6)),
                 boxNode(m.taillight, 0.05, 0.18, 0.18, r: 0.03, at: V(-2.21, 0.95, 0.6)),
                 boxNode(m.taillight, 0.05, 0.18, 0.18, r: 0.03, at: V(-2.21, 0.95, -0.6)),
-                boxNode(m.trim, 0.62, 0.95, 0.03, r: 0.02, at: V(1.45, 1.2, 0.85)),
-                boxNode(m.glass, 0.5, 0.4, 0.035, r: 0.02, at: V(1.45, 1.45, 0.85)),
-            ])
+                boxNode(m.trim, 0.62, 0.8, 0.03, r: 0.02, at: V(1.45, 1.0, 0.85)),
+            ] + cabin(m, x: 0, bottom: 1.42, length: 4.4, height: 0.52, width: 1.7, pillars: 4))
         },
         BodyStyle(id: "bubble", wheelRadius: 0.42, wheelbase: 1.9, track: 1.6, wheelWidth: 0.36,
-                  roof: V(-0.1, 1.8, 0), rear: V(-1.3, 1.15, 0)) { m in
+                  roof: V(-0.1, 1.8, 0), rear: V(-1.3, 1.15, 0), seat: V(-0.05, 1.05, 0), driverScale: 0.85) { m in
             group("body", [
                 sphereNode(m.paint, r: 1, at: V(0, 0.85, 0), scale: V(1.55, 0.64, 0.84)),
                 sphereNode(m.glass, r: 1, at: V(-0.1, 1.24, 0), scale: V(0.95, 0.56, 0.72)),
@@ -195,12 +198,9 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "pickup", wheelRadius: 0.48, wheelbase: 2.6, track: 1.75, wheelWidth: 0.4,
-                  roof: V(0.25, 1.88, 0), rear: V(-1.8, 1.5, 0)) { m in
+                  roof: V(0.25, 1.88, 0), rear: V(-1.8, 1.5, 0), seat: V(0.3, 0.95, 0), driverScale: 0.95) { m in
             group("body", [
                 boxNode(m.paint, 3.9, 0.6, 1.6, r: 0.16, at: V(0, 0.9, 0)),
-                boxNode(m.paint, 1.25, 0.72, 1.5, r: 0.2, at: V(0.25, 1.52, 0)),
-                boxNode(m.glass, 1.0, 0.4, 1.52, r: 0.1, at: V(0.25, 1.58, 0)),
-                boxNode(m.glass, 0.06, 0.4, 1.3, r: 0.03, at: V(0.88, 1.58, 0)),
                 boxNode(m.trim, 1.6, 0.06, 1.42, at: V(-1.05, 1.21, 0)),
                 boxNode(m.paint, 1.7, 0.32, 0.1, r: 0.04, at: V(-1.05, 1.36, 0.75)),
                 boxNode(m.paint, 1.7, 0.32, 0.1, r: 0.04, at: V(-1.05, 1.36, -0.75)),
@@ -212,7 +212,7 @@ enum Catalog {
                 boxNode(m.chrome, 0.15, 0.16, 1.7, r: 0.06, at: V(-2.0, 0.7, 0)),
                 boxNode(m.taillight, 0.05, 0.16, 0.2, r: 0.03, at: V(-1.96, 1.0, 0.62)),
                 boxNode(m.taillight, 0.05, 0.16, 0.2, r: 0.03, at: V(-1.96, 1.0, -0.62)),
-            ])
+            ] + cabin(m, x: 0.25, bottom: 1.2, length: 1.25, height: 0.55, width: 1.5))
         },
     ]
 
@@ -419,6 +419,23 @@ enum Catalog {
         PaintStyle(id: "gold", color: UIColor(red: 1.0, green: 0.75, blue: 0.25, alpha: 1), metallic: true),
         PaintStyle(id: "silver", color: UIColor(white: 0.85, alpha: 1), metallic: true),
     ]
+
+    /// A see-through cab: corner pillars, a roof, and a glass box so the driver shows.
+    static func cabin(_ m: CarMaterials, x: Float, bottom: Float, length: CGFloat, height: CGFloat, width: CGFloat, pillars: Int = 2) -> [SCNNode] {
+        let l = Float(length), h = Float(height), w = Float(width)
+        let p: CGFloat = 0.12
+        let inset = Float(p) / 2
+        var parts: [SCNNode] = []
+        for i in 0..<pillars {
+            let px = x - l / 2 + inset + (l - 2 * inset) * Float(i) / Float(pillars - 1)
+            for side: Float in [1, -1] {
+                parts.append(boxNode(m.paint, p, height, p, r: 0.04, at: V(px, bottom + h / 2, side * (w / 2 - inset))))
+            }
+        }
+        parts.append(boxNode(m.paint, length + 0.06, 0.13, width + 0.06, r: 0.06, at: V(x, bottom + h + 0.05, 0)))
+        parts.append(boxNode(m.glass, length - 0.05, height, width - 0.05, r: 0.03, at: V(x, bottom + h / 2, 0)))
+        return parts
+    }
 
     static func body(_ id: String) -> BodyStyle { bodies.first { $0.id == id } ?? bodies[0] }
     static func wheel(_ id: String) -> WheelStyle { wheels.first { $0.id == id } ?? wheels[0] }

@@ -126,9 +126,11 @@ final class GarageScene {
             let built = swapCar(design)
             if let t = built.topper { popIn(t, delay: 0) }
             hop(delay: 0.15)
+            Driver.cheer(built.driver)
             SoundFX.shared.play(.pop)
         } else if prev.paint != design.paint {
             wiggle()
+            if let d = car?.driver { Driver.cheer(d) }
             sparkleBurst(color: Catalog.paint(design.paint).color)
             SoundFX.shared.play(.sparkle)
         }

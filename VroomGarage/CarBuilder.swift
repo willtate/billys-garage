@@ -7,6 +7,7 @@ struct BuiltCar {
     let wheelMounts: [SCNNode]
     let spinners: [SCNNode]
     let topper: SCNNode?
+    let driver: SCNNode
 }
 
 enum CarBuilder {
@@ -28,6 +29,11 @@ enum CarBuilder {
         let bodyNode = body.build(m)
         bodyNode.position.y += lift
         root.addChildNode(bodyNode)
+
+        let driver = Driver.make(m)
+        driver.position = V(body.seat.x, body.seat.y, body.seat.z)
+        driver.scale = V(body.driverScale, body.driverScale, body.driverScale)
+        bodyNode.addChildNode(driver)
 
         var mounts: [SCNNode] = []
         var spinners: [SCNNode] = []
@@ -60,6 +66,6 @@ enum CarBuilder {
             topperNode = t
         }
 
-        return BuiltCar(root: root, body: bodyNode, wheelMounts: mounts, spinners: spinners, topper: topperNode)
+        return BuiltCar(root: root, body: bodyNode, wheelMounts: mounts, spinners: spinners, topper: topperNode, driver: driver)
     }
 }
