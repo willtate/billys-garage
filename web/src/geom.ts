@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Car space: +X is the front of the car, +Y is up, Z is the car's width. Ground is y = 0.
 // Same as the SceneKit version, so the numbers port across unchanged.
@@ -25,31 +26,31 @@ function mesh(g: THREE.BufferGeometry, m: Mat, at: Vec): THREE.Mesh {
 
 export function box(m: Mat, sx: number, sy: number, sz: number, r = 0, at: Vec = [0, 0, 0]): THREE.Mesh {
   const rr = Math.min(r, Math.min(sx, sy, sz) / 2 - 1e-4);
-  const g = rr > 0.002 ? new RoundedBoxGeometry(sx, sy, sz, 3, rr) : new THREE.BoxGeometry(sx, sy, sz);
+  const g = rr > 0.002 ? new RoundedBoxGeometry(sx, sy, sz, 2, rr) : new THREE.BoxGeometry(sx, sy, sz);
   return mesh(g, m, at);
 }
 
 export function sphere(m: Mat, r: number, at: Vec, scale: Vec = [1, 1, 1]): THREE.Mesh {
-  const n = mesh(new THREE.SphereGeometry(r, 40, 24), m, at);
+  const n = mesh(new THREE.SphereGeometry(r, 24, 14), m, at);
   n.scale.set(...scale);
   return n;
 }
 
-export function cyl(m: Mat, r: number, h: number, axis: Axis = 'y', at: Vec = [0, 0, 0], seg = 40): THREE.Mesh {
+export function cyl(m: Mat, r: number, h: number, axis: Axis = 'y', at: Vec = [0, 0, 0], seg = 24): THREE.Mesh {
   const n = mesh(new THREE.CylinderGeometry(r, r, h, seg), m, at);
   orient(n, axis);
   return n;
 }
 
 export function cone(m: Mat, top: number, bottom: number, h: number, axis: Axis = 'y', at: Vec = [0, 0, 0]): THREE.Mesh {
-  const n = mesh(new THREE.CylinderGeometry(top, bottom, h, 36), m, at);
+  const n = mesh(new THREE.CylinderGeometry(top, bottom, h, 20), m, at);
   orient(n, axis);
   return n;
 }
 
 /** SceneKit tori lie flat in XZ (axis +Y); Three's stand in XY. Bake the difference into the geometry. */
 export function torus(m: Mat, ring: number, pipe: number, axis: Axis = 'y', at: Vec = [0, 0, 0]): THREE.Mesh {
-  const g = new THREE.TorusGeometry(ring, pipe, 20, 56);
+  const g = new THREE.TorusGeometry(ring, pipe, 10, 32);
   g.rotateX(Math.PI / 2);
   const n = mesh(g, m, at);
   orient(n, axis);
@@ -58,7 +59,7 @@ export function torus(m: Mat, ring: number, pipe: number, axis: Axis = 'y', at: 
 
 /** SceneKit capsule height includes the caps; Three's length doesn't. */
 export function capsule(m: Mat, r: number, h: number, axis: Axis = 'y', at: Vec = [0, 0, 0]): THREE.Mesh {
-  const n = mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, h - 2 * r), 8, 24), m, at);
+  const n = mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, h - 2 * r), 4, 12), m, at);
   orient(n, axis);
   return n;
 }
@@ -69,7 +70,7 @@ export function tube(m: Mat, inner: number, outer: number, h: number, at: Vec = 
     new THREE.Vector2(inner, -h / 2), new THREE.Vector2(outer, -h / 2),
     new THREE.Vector2(outer, h / 2), new THREE.Vector2(inner, h / 2), new THREE.Vector2(inner, -h / 2),
   ];
-  return mesh(new THREE.LatheGeometry(pts, 56), m, at);
+  return mesh(new THREE.LatheGeometry(pts, 32), m, at);
 }
 
 export function group(children: THREE.Object3D[], name?: string): THREE.Group {
@@ -83,7 +84,7 @@ export function group(children: THREE.Object3D[], name?: string): THREE.Group {
 export function rod(m: Mat, a: Vec, b: Vec, r: number): THREE.Mesh {
   const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
   const d = vb.clone().sub(va);
-  const n = mesh(new THREE.CylinderGeometry(r, r, d.length(), 20), m, [0, 0, 0]);
+  const n = mesh(new THREE.CylinderGeometry(r, r, d.length(), 12), m, [0, 0, 0]);
   n.position.copy(va.add(vb).multiplyScalar(0.5));
   n.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
   return n;
@@ -212,4 +213,50 @@ export function seeded(seed: number) {
     s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0;
     return s / 4294967296;
   };
+}
+
+/**
+ * Fold every mesh under `root` that never moves on its own into one mesh per material,
+ * so the GPU gets a handful of draws instead of hundreds. Meshes inside `keep` subtrees
+ * (animated parts) and multi-material meshes are left alone.
+ */
+export function mergeStatic(root: THREE.Object3D, keep: (o: THREE.Object3D) => boolean = () => false) {
+  root.updateMatrixWorld(true);
+  const inv = root.matrixWorld.clone().invert();
+  const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const order = new Map<THREE.Material, number>();
+  const done: THREE.Mesh[] = [];
+  const visit = (o: THREE.Object3D) => {
+    if (o !== root && keep(o)) return;
+    if (o instanceof THREE.Mesh && !Array.isArray(o.material)) {
+      let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      const keepAttrs = ['position', 'normal', 'uv'];
+      for (const k of Object.keys(g.attributes)) if (!keepAttrs.includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      g.clearGroups();
+      g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      // A mirrored transform flips the winding; put it back.
+      if (o.matrixWorld.determinant() < 0) {
+        const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
+        for (let i = 0; i < pos.count; i += 3) for (const a of [pos, nor, uv]) {
+          for (let c = 0; c < a.itemSize; c++) { const t = a.getComponent(i + 1, c); a.setComponent(i + 1, c, a.getComponent(i + 2, c)); a.setComponent(i + 2, c, t); }
+        }
+      }
+      const list = buckets.get(o.material) ?? [];
+      list.push(g);
+      buckets.set(o.material, list);
+      order.set(o.material, Math.max(order.get(o.material) ?? 0, o.renderOrder));
+      done.push(o);
+    }
+    o.children.forEach(visit);
+  };
+  visit(root);
+  for (const m of done) m.removeFromParent();
+  for (const [mat, geos] of buckets) {
+    const merged = mergeGeometries(geos, false);
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.renderOrder = order.get(mat) ?? 0;
+    root.add(mesh);
+  }
 }

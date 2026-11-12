@@ -33,7 +33,7 @@ export class Loft {
   private poly: THREE.Vector2[];
   private grid: V3[][] = [];
   private norms: V3[][] = [];
-  private readonly N = 96;
+  private readonly N = 64;
 
   constructor(readonly outline: Outline, spec: LoftSpec, paint: THREE.Material, under: THREE.Material) {
     this.spec = { topExp: 3, lowExp: 4, cornerF: 0.2, cornerR: 0.2, flare: 0, wells: [], wellR: 0.5, ...spec };

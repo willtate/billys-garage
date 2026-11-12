@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, canvas, tracePath } from './geom';
+import { box, canvas, mergeStatic, tracePath } from './geom';
 import { BodyBuild, BodyStyle, makeDriver, stripes } from './bodies';
 import { CarMaterials } from './materials';
 import { WheelStyle } from './wheels';
@@ -52,6 +52,9 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
   driver.scale.setScalar(body.driverScale);
   bodyNode.add(driver);
 
+  // Everything on the body except the bobbing helmet becomes a few big meshes.
+  mergeStatic(bodyNode, (o) => o.name === 'head');
+
   const spinners: THREE.Object3D[] = [];
   const halfTrack = body.track / 2 + (width - body.wheelWidth) / 2;
   for (const x of [body.wheelbase / 2, -body.wheelbase / 2]) {
@@ -61,6 +64,7 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
       if (side < 0) mount.rotation.y = Math.PI; // hub faces outward on both sides
       const spinner = new THREE.Group();
       const shape = wheel.build(m, radius, width);
+      mergeStatic(shape);
       shape.rotation.x = Math.PI / 2; // axle along +Z, hub face outward
       spinner.add(shape);
       mount.add(spinner);
@@ -108,8 +112,7 @@ function sideStripes(shell: BodyBuild, m: CarMaterials): THREE.Object3D {
     return t;
   };
   return shell.loft.decal(draw(false), draw(true), b, 0.006, 5, (map) => {
-    const mat = new THREE.MeshPhysicalMaterial({ map, transparent: true, depthWrite: false, roughness: 0.3, clearcoat: 1,
-      clearcoatRoughness: 0.04, polygonOffset: true, polygonOffsetFactor: -4 });
+    const mat = new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -4 });
     mat.color = m.stripe.color; // shared, so a paint change recolours it
     return mat;
   });

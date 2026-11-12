@@ -4,21 +4,15 @@ import { BuiltCar, buildCar, Design } from './car';
 import { makeReflectionRig, makeTurntable, makeWorkshop } from './garage';
 import { CarMaterials, paints } from './materials';
 import { wheels } from './wheels';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // MARK: Renderer and scene
 
 const view = document.getElementById('view') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas: view, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// 1.5x is sharp enough on a Retina iPad and draws about half the pixels of 2x.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.toneMappingExposure = 1.0;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1f1f1f);
@@ -36,22 +30,8 @@ userSpin.rotation.y = -0.7;
 // Lights: a key light from the roof with soft shadows, two cool rim lights and a warm fill.
 const key = new THREE.DirectionalLight(0xfff8eb, 2.4);
 key.position.set(3.5, 10, 4);
-key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.left = key.shadow.camera.bottom = -5;
-key.shadow.camera.right = key.shadow.camera.top = 5;
-key.shadow.camera.near = 1;
-key.shadow.camera.far = 30;
-key.shadow.radius = 6;
-key.shadow.bias = -0.0004;
-key.shadow.normalBias = 0.02;
 scene.add(key);
-for (const [x, z] of [[-7, -4], [7, -5]]) {
-  const rim = new THREE.PointLight(0xcce6ff, 30, 22, 1.5);
-  rim.position.set(x, 5, z);
-  scene.add(rim);
-}
-scene.add(new THREE.HemisphereLight(0xfff2e0, 0x3a3530, 0.5));
+scene.add(new THREE.HemisphereLight(0xfff2e0, 0x3a3530, 0.8));
 
 // Camera on a rig aimed slightly below the car so the car sits above the parts tray.
 const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 120);
@@ -253,28 +233,9 @@ renderCards();
 
 // MARK: Frame loop
 
-// MARK: Post-processing: ambient occlusion (grounds the car, darkens wells and seams) and a
-// gentle bloom on lamps and highlights. `?lite` turns it off for slow devices.
-
-const lite = new URLSearchParams(location.search).has('lite');
-const composer = lite ? null : (() => {
-  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
-  const c = new EffectComposer(renderer, rt);
-  c.addPass(new RenderPass(scene, camera));
-  const ao = new GTAOPass(scene, camera, 1, 1);
-  ao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.5, thickness: 1, scale: 1.2 });
-  ao.blendIntensity = 0.85;
-  c.addPass(ao);
-  c.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.25, 2.6));
-  c.addPass(new OutputPass());
-  return c;
-})();
-
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
-  composer?.setPixelRatio(renderer.getPixelRatio());
-  composer?.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
@@ -289,9 +250,15 @@ const fpsEl = q.has('fps') ? Object.assign(document.body.appendChild(document.cr
 }) : null;
 let frames = 0, fpsT = 0;
 
+// Draw at most 60 times a second (ProMotion screens would otherwise ask for 120), and
+// only 30 while nothing is being touched and the car is just swaying.
+let lastDraw = 0;
 renderer.setAnimationLoop((now) => {
+  const idle = !touching && !fling && now - popT0 > 400 && now - hopT0 > 600;
+  if (now - lastDraw < (idle ? 31 : 15.5)) return;
+  lastDraw = now;
   materials.tick(now);
-  if (fpsEl && ++frames && now - fpsT > 1000) { fpsEl.textContent = `${Math.round((frames * 1000) / (now - fpsT))} fps`; frames = 0; fpsT = now; }
+  if (fpsEl && ++frames && now - fpsT > 1000) { fpsEl.textContent = `${Math.round((frames * 1000) / (now - fpsT))} fps · ${renderer.info.render.calls} calls · ${Math.round(renderer.info.render.triangles / 1000)}k tris`; frames = 0; fpsT = now; }
   camera.position.z += (cameraDistance - camera.position.z) * 0.25;
 
   if (fling) {
@@ -318,7 +285,7 @@ renderer.setAnimationLoop((now) => {
     const head = car.driver.getObjectByName('head');
     if (head) head.position.y = 0.66 + 0.01 * Math.max(0, Math.sin(now / 190));
   }
-  if (composer) composer.render(); else renderer.render(scene, camera);
+  renderer.render(scene, camera);
 });
 
 if (import.meta.env.DEV) Object.assign(window, { vg: { THREE, scene, camera, cameraRig, userSpin, autoSpin, materials, renderer, setDistance: (d: number) => { cameraDistance = d; } } });

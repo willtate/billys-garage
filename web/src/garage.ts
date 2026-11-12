@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, canvas, cone, cyl, seeded, tex, torus } from './geom';
+import { box, canvas, cone, cyl, mergeStatic, seeded, tex, torus } from './geom';
 
 export const FLOOR_Y = -0.25;
 export const ROAD_RADIUS = 5.8;
@@ -101,6 +101,7 @@ export function makeWorkshop(): THREE.Group {
   root.add(drum(0x1a4dcc, -10.9, G, -9.6), drum(0xcc1a14, -10.2, G, -10.9));
   for (const [x, z] of [[-7.6, -3.6], [7.8, -4.6], [-8.4, 2.2], [8.6, 1.4]]) root.add(trafficCone(x, G, z));
   root.add(track());
+  mergeStatic(root);
   return root;
 }
 
@@ -142,6 +143,7 @@ export function makeTurntable(): THREE.Group {
     const a = (i / 16) * Math.PI * 2;
     g.add(cyl(led, 0.05, 0.01, 'y', [Math.cos(a) * 3.3, 0.002, Math.sin(a) * 3.3], 16));
   }
+  mergeStatic(g);
   return g;
 }
 

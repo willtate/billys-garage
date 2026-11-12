@@ -134,7 +134,7 @@ const P = {
       return t;
     };
     const n = loft.decal(draw(false), draw(true), b, 0.003, 4, (map) =>
-      new THREE.MeshPhysicalMaterial({ map, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -2 }));
+      new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -2 }));
     n.name = 'panelLines';
     return n;
   },
@@ -176,11 +176,12 @@ const P = {
 
 // MARK: - Driver
 
+const suit = new THREE.MeshStandardMaterial({ color: 0x1a2440, roughness: 0.7 });
+const glove = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.55 });
+const dark = new THREE.MeshStandardMaterial({ color: 0x0f0f0f, roughness: 0.35 });
+const visor = new THREE.MeshStandardMaterial({ color: 0x141f33, metalness: 0.85, roughness: 0.06 });
+
 export function makeDriver(m: CarMaterials): THREE.Group {
-  const suit = new THREE.MeshPhysicalMaterial({ color: 0x1a2440, roughness: 0.7 });
-  const glove = new THREE.MeshPhysicalMaterial({ color: 0x1a1a1a, roughness: 0.55 });
-  const dark = new THREE.MeshPhysicalMaterial({ color: 0x0f0f0f, roughness: 0.35 });
-  const visor = new THREE.MeshPhysicalMaterial({ color: 0x141f33, metalness: 0.85, roughness: 0.06, clearcoat: 1 });
   const root = new THREE.Group();
   root.name = 'driver';
   const torso = capsule(suit, 0.17, 0.5, 'y', [0, 0.25, 0]);

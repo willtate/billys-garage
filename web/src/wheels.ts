@@ -3,6 +3,10 @@ import { box, cyl, group, sphere, torus, tube } from './geom';
 import { CarMaterials } from './materials';
 
 type O = THREE.Object3D;
+
+const disc = new THREE.MeshStandardMaterial({ color: 0x737373, metalness: 0.9, roughness: 0.45 });
+const nut = new THREE.MeshStandardMaterial({ color: 0xe61a1a, metalness: 0.6, roughness: 0.3 });
+const glow = new THREE.MeshStandardMaterial({ color: 0x33fff2, roughness: 0.2, emissive: 0x1af2ff, emissiveIntensity: 1.6 });
 type Mat = THREE.Material;
 
 // Every wheel is built around +Y (the axle) with the hub face toward +Y.
@@ -15,7 +19,7 @@ const Kit = {
     const side = torus(m.rubber, ring, pipe);
     side.scale.set(1, w / 2 / pipe, 1);
     // The tread is an open band: a capped cylinder would hide everything set into the rim.
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w * 0.8, 64, 1, true), m.tread);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w * 0.8, 36, 1, true), m.tread);
     band.castShadow = band.receiveShadow = true;
     const out: O[] = [side, band];
     if (whitewall) out.push(tube(m.white, ring - pipe * 0.55, ring + pipe * 0.35, 0.012, [0, w * 0.49, 0]));
@@ -36,7 +40,6 @@ const Kit = {
 
   /** The rim's barrel, a dark back face, brake disc and the outer lip. */
   barrel(m: CarMaterials, rim: number, w: number, lip: Mat, back?: Mat): O[] {
-    const disc = new THREE.MeshPhysicalMaterial({ color: 0x737373, metalness: 0.9, roughness: 0.45 });
     return [
       tube(m.gunmetal, rim * 0.9, rim, w * 0.84),
       cyl(back ?? m.grille, rim * 0.9, 0.02, 'y', [0, -w * 0.1, 0]),
@@ -109,7 +112,6 @@ export const wheels: WheelStyle[] = [
   {
     id: 'racing', label: 'Racing', scale: 0.98, widthScale: 1.25, build: (m, r, w) => {
       const rim = r * 0.72;
-      const nut = new THREE.MeshPhysicalMaterial({ color: 0xe61a1a, metalness: 0.6, roughness: 0.3 });
       return group([...Kit.tyre(m, r, w, rim), ...Kit.barrel(m, rim, w, m.gold),
         ...Kit.spokes(m.gold, 6, rim * 0.15, rim * 0.95, w * 0.32, rim * 0.13, w * 0.1),
         cyl(nut, rim * 0.17, w * 0.16, 'y', [0, w * 0.4, 0]), cyl(m.gold, rim * 0.22, w * 0.1, 'y', [0, w * 0.36, 0])]);
@@ -157,7 +159,6 @@ export const wheels: WheelStyle[] = [
   {
     id: 'glow', label: 'Glow', scale: 1, widthScale: 1.1, build: (m, r, w) => {
       const rim = r * 0.66;
-      const glow = new THREE.MeshPhysicalMaterial({ color: 0x33fff2, roughness: 0.2, emissive: 0x1af2ff, emissiveIntensity: 1.6 });
       return group([...Kit.tyre(m, r, w, rim), ...Kit.barrel(m, rim, w, glow, m.trim),
         ...Kit.spokes(m.trim, 7, rim * 0.18, rim * 0.92, w * 0.33, rim * 0.1, w * 0.1), ...Kit.hub(m, rim, w, glow)]);
     },
