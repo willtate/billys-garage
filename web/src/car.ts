@@ -16,6 +16,8 @@ export interface BuiltCar {
   root: THREE.Group;
   body: THREE.Group;
   spinners: THREE.Object3D[];
+  wheelMounts: THREE.Object3D[];
+  sticker: THREE.Object3D | null;
   driver: THREE.Group;
   addons: Partial<Record<Slot, THREE.Object3D>>;
   /** Animated bits (police lights, beacon, rocket flames): call every frame. */
@@ -56,7 +58,8 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
   bodyNode.position.y += lift;
   bodyNode.userData.baseY = bodyNode.position.y;
   root.add(bodyNode);
-  if (design.sticker === 'stripes') bodyNode.add(...stripes(shell, m));
+  const runs = design.sticker === 'stripes' ? stripes(shell, m) : [];
+  if (runs.length) bodyNode.add(...runs);
   const sticker = makeSticker(design.sticker, body.id, shell, m);
   if (sticker) bodyNode.add(sticker);
 
@@ -65,8 +68,9 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
   driver.scale.setScalar(body.driverScale);
   bodyNode.add(driver);
 
-  // Everything on the body except the bobbing helmet becomes a few big meshes.
-  mergeStatic(bodyNode, (o) => o.name === 'head');
+  // Everything on the body except the driver (who bobs and cheers) becomes a few big meshes.
+  mergeStatic(driver, (o) => o.name === 'head');
+  mergeStatic(bodyNode, (o) => o.name === 'driver');
 
   const fitted: BuiltCar['addons'] = {};
   const tickers: BuiltCar['tickers'] = [];
@@ -81,7 +85,7 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
     if (n.userData.tick) tickers.push(n.userData.tick);
   }
 
-  const spinners: THREE.Object3D[] = [];
+  const spinners: THREE.Object3D[] = [], mounts: THREE.Object3D[] = [];
   const halfTrack = body.track / 2 + (width - body.wheelWidth) / 2;
   for (const x of [body.wheelbase / 2, -body.wheelbase / 2]) {
     for (const side of [1, -1]) {
@@ -89,6 +93,7 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
       mount.position.set(x, radius, side * halfTrack);
       if (side < 0) mount.rotation.y = Math.PI; // hub faces outward on both sides
       const spinner = new THREE.Group();
+      spinner.userData.dir = side > 0 ? -1 : 1; // rolling forward, seen from each side
       const shape = wheel.build(m, radius, width);
       mergeStatic(shape);
       shape.rotation.x = Math.PI / 2; // axle along +Z, hub face outward
@@ -100,6 +105,7 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
       }
       root.add(mount);
       spinners.push(spinner);
+      mounts.push(mount);
     }
   }
 
@@ -113,5 +119,5 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
   root.add(shadow);
 
   const tailpipe = new THREE.Vector3(body.tail.x - 0.1, body.tail.y + lift, 0);
-  return { root, body: bodyNode, spinners, driver, addons: fitted, tickers, tailpipe };
+  return { root, body: bodyNode, spinners, wheelMounts: mounts, sticker, driver, addons: fitted, tickers, tailpipe };
 }

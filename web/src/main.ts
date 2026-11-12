@@ -7,6 +7,9 @@ import { makeReflectionRig, makeTurntable, makeWorkshop } from './garage';
 import { CarMaterials, paints } from './materials';
 import { wheels } from './wheels';
 import { autoUpdate } from './update';
+import { animate, burst, easeIn, easeOut, smooth, tickAnims, tickBursts } from './fx';
+import { play, unlock } from './sound';
+import { ROAD_RADIUS } from './garage';
 
 // MARK: Renderer and scene
 
@@ -72,31 +75,171 @@ const q = new URLSearchParams(location.search);
 let design: Design = { body: 'muscle', wheels: 'alloy', paint: 'blue', sticker: 'stripes', engine: 'none', front: 'none', roof: 'none', back: 'none', ...(saved ?? {}) };
 for (const k of ['body', 'wheels', 'paint', 'sticker', ...slots] as const) { const v = q.get(k); if (v) design[k] = v; }
 let car: BuiltCar | null = null;
-let popT0 = 0, hopT0 = -1e9;
+let driving = false;
 
-function rebuild(pop: boolean) {
+function swapCar(): BuiltCar {
   if (car) carHolder.remove(car.root);
   const wheel = wheels.find((w) => w.id === design.wheels) ?? wheels[0];
   const body = bodies.find((b) => b.id === design.body) ?? bodies[0];
   car = buildCar(design, body, wheel, materials);
   carHolder.add(car.root);
-  if (pop) popT0 = performance.now();
+  frameCar(car);
+  return car;
+}
+
+/** Pull the camera back for big cars, in for small ones. */
+function frameCar(c: BuiltCar) {
+  const box = new THREE.Box3().setFromObject(c.body);
+  const size = box.getSize(new THREE.Vector3());
+  cameraDistance = THREE.MathUtils.clamp(Math.max(size.x * 2.25, (box.max.y - 0) * 4.2), MIN_D, MAX_D);
 }
 
 function apply(next: Design) {
   const prev = design;
   design = next;
   localStorage.setItem('vroom.design', JSON.stringify(design));
-  if (prev.paint !== next.paint) {
-    materials.setPaint(paints.find((p) => p.id === next.paint) ?? paints[7], true);
-    hopT0 = performance.now();
+  const slot = slots.find((k) => prev[k] !== next[k]);
+  if (prev.body !== next.body) {
+    const c = swapCar();
+    dropIn(c.body, 2.6);
+    c.wheelMounts.forEach((m, i) => popIn(m, 250 + i * 60));
+    play('clunk');
+  } else if (prev.wheels !== next.wheels) {
+    const c = swapCar();
+    c.wheelMounts.forEach((m, i) => popIn(m, i * 80));
+    hop(300);
+    play('boing');
+  } else if (slot) {
+    const c = swapCar();
+    const n = c.addons[slot];
+    if (n) popIn(n, 0);
+    hop(150);
+    cheer(c.driver);
+    play(next[slot] === 'none' ? 'click' : 'clunk');
+  } else if (prev.sticker !== next.sticker) {
+    const c = swapCar();
+    wiggle();
+    cheer(c.driver);
+    sparkles(new THREE.Color(0xffffff));
+    play('sparkle');
+  } else if (prev.paint !== next.paint) {
+    const p = paints.find((x) => x.id === next.paint) ?? paints[7];
+    materials.setPaint(p, true);
+    wiggle();
+    if (car) cheer(car.driver);
+    sparkles(new THREE.Color(p.color));
+    play('sparkle');
   }
-  const keys: (keyof Design)[] = ['body', 'wheels', 'sticker', ...slots];
-  if (keys.some((k) => prev[k] !== next[k])) rebuild(true);
+}
+
+// MARK: Little celebrations
+
+function popIn(o: THREE.Object3D, delay: number) {
+  o.scale.setScalar(0.01);
+  animate(delay, 180, (u) => o.scale.setScalar(0.01 + 1.17 * easeOut(u)));
+  animate(delay + 180, 140, (u) => o.scale.setScalar(1.18 - 0.18 * smooth(u)));
+}
+
+function dropIn(o: THREE.Object3D, height: number) {
+  const base = o.position.y;
+  o.position.y = base + height;
+  animate(0, 320, (u) => { o.position.y = base + height * (1 - easeIn(u)); }, squash);
+}
+
+function hop(delay = 0) {
+  animate(delay, 160, (u) => { carHolder.position.y = 0.45 * easeOut(u); });
+  animate(delay + 160, 160, (u) => { carHolder.position.y = 0.45 * (1 - easeIn(u)); }, squash);
+}
+
+function squash() {
+  animate(0, 100, (k) => carHolder.scale.set(1 + 0.08 * k, 1 - 0.12 * k, 1 + 0.08 * k));
+  animate(100, 220, (k) => {
+    const w = Math.cos(k * Math.PI * 2.5) * (1 - k);
+    carHolder.scale.set(1 + 0.08 * w, 1 - 0.12 * w, 1 + 0.08 * w);
+  }, () => carHolder.scale.setScalar(1));
+}
+
+function wiggle() {
+  const a = 0.12, keys = [[0, a, 80], [a, -a, 120], [-a, a * 0.6, 100], [a * 0.6, 0, 100]];
+  let t = 0;
+  for (const [from, to, d] of keys) { animate(t, d, (u) => { carHolder.rotation.z = from + (to - from) * smooth(u); }); t += d; }
+}
+
+/** The driver's happy little jump. */
+function cheer(driver: THREE.Object3D) {
+  const y0 = driver.position.y;
+  for (let i = 0; i < 2; i++) {
+    animate(i * 260, 120, (u) => { driver.position.y = y0 + 0.18 * easeOut(u); });
+    animate(i * 260 + 120, 140, (u) => { driver.position.y = y0 + 0.18 * (1 - easeIn(u)); });
+  }
+}
+
+function sparkles(color: THREE.Color) {
+  burst(carHolder, { at: new THREE.Vector3(0, 1.1, 0), count: 48, color, speed: 4, spread: 1, radius: 1.2,
+    size: 0.2, life: 1100, gravity: -6, additive: true });
+}
+
+function honk() {
+  play('honk');
+  squash();
+  const h = materials.headlight, base = h.emissiveIntensity;
+  const flash = [[0, 150, base * 2.5], [150, 100, base], [250, 200, base * 2.5], [450, 1, base]];
+  for (const [t, d, v] of flash) animate(t, d, () => { h.emissiveIntensity = v; });
+}
+
+function exhaust() {
+  if (!car) return;
+  const at = car.tailpipe.clone().applyMatrix4(carHolder.matrixWorld);
+  const dir = new THREE.Vector3(-1, 0.3, 0).transformDirection(carHolder.matrixWorld);
+  for (let i = 0; i < 4; i++) {
+    animate(i * 100, 1, () => burst(scene, { at, count: 6, color: new THREE.Color(0xe6e6e6), speed: 1.5, spread: 0.25, dir,
+      size: 0.35, life: 800, gravity: 0.8, grow: 4, opacity: 0.7 }));
+  }
+}
+
+const LAP = 4200;
+function vroom() {
+  if (driving || !car) return;
+  driving = true;
+  play('vroom');
+  const c = car;
+  // Spin every wheel; right-side mounts are flipped, so they spin the other way.
+  for (const s of c.spinners) animate(0, LAP + 300, (u) => { s.rotation.z = s.userData.dir * 90 * smooth(u); });
+  // Rev, drive off the turntable onto the road, do a lap, come home and spin round.
+  animate(0, 150, (u) => { carHolder.rotation.z = 0.06 * smooth(u); });
+  animate(150, 150, (u) => { carHolder.rotation.z = 0.06 * (1 - smooth(u)); }, exhaust);
+  const R = ROAD_RADIUS, total = R * 2 + 2 * Math.PI * R;
+  animate(300, LAP, (u) => {
+    const s = smooth(u) * total;
+    let x: number, z: number, yaw: number;
+    if (s < R) { x = s; z = 0; yaw = (Math.PI / 2) * smooth((s - 0.55 * R) / (0.45 * R)); }
+    else if (s < R + 2 * Math.PI * R) { const th = (s - R) / R; x = R * Math.cos(th); z = -R * Math.sin(th); yaw = th + Math.PI / 2; }
+    else { const d = s - R - 2 * Math.PI * R; x = R - d; z = 0; yaw = 2.5 * Math.PI + (Math.PI / 2) * smooth(d / (0.45 * R)); }
+    const r = Math.hypot(x, z);
+    carHolder.position.set(x, -0.25 * smooth((r - 3.4) / 0.5), z);
+    carHolder.rotation.y = yaw;
+  }, () => {
+    const y0 = carHolder.rotation.y;
+    animate(0, 450, (u) => { carHolder.rotation.y = y0 + Math.PI * easeOut(u); }, () => {
+      carHolder.rotation.set(0, 0, 0);
+      carHolder.position.set(0, 0, 0);
+      driving = false;
+      hop();
+    });
+  });
+  // Lift the camera so the whole lap stays above the parts tray, then glide back.
+  const rest = cameraDistance;
+  animate(300, LAP + 300, (u) => {
+    const k = smooth(u / 0.15) * (1 - smooth((u - 0.85) / 0.15));
+    cameraRig.rotation.x = -0.2 - 0.42 * k;
+    cameraRig.position.set(0, 0.55, 3 * k);
+    camera.position.z = rest + (19 - rest) * k;
+  }, () => { cameraRig.rotation.x = -0.2; cameraRig.position.set(0, 0.55, 0); camera.position.z = rest; });
 }
 
 materials.setPaint(paints.find((p) => p.id === design.paint) ?? paints[7], false);
-rebuild(false);
+swapCar();
+camera.position.z = cameraDistance;
 captureReflections();
 
 // MARK: Touch: one finger spins the turntable, two fingers zoom.
@@ -112,8 +255,11 @@ function beginTouch() { touching = true; fling = null; sway = null; lastTouch = 
 function endTouch() { touching = false; lastTouch = performance.now(); resumeAt = performance.now() + 4000; }
 const dist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 
+let downAt = { x: 0, y: 0, t: 0 };
+window.addEventListener('pointerdown', unlock, { capture: true });
 view.addEventListener('pointerdown', (e) => {
   view.setPointerCapture(e.pointerId);
+  downAt = { x: e.clientX, y: e.clientY, t: e.timeStamp };
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   beginTouch();
   if (pointers.size === 1) { lastX = e.clientX; lastT = e.timeStamp; vx = 0; }
@@ -134,6 +280,7 @@ view.addEventListener('pointermove', (e) => {
 const up = (e: PointerEvent) => {
   if (!pointers.delete(e.pointerId)) return;
   if (pointers.size === 0) {
+    if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 12 && e.timeStamp - downAt.t < 350) tapped(e);
     if (Math.abs(vx) > 30 && e.timeStamp - lastT < 80) fling = { from: userSpin.rotation.y, by: vx * 0.011 * 0.3, t0: performance.now() };
     endTouch();
   } else if (pointers.size === 1) {
@@ -142,6 +289,16 @@ const up = (e: PointerEvent) => {
   }
 };
 view.addEventListener('pointerup', up);
+
+/** Tapping the car honks the horn. */
+const ray = new THREE.Raycaster();
+function tapped(e: PointerEvent) {
+  ray.setFromCamera(new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera);
+  if (ray.intersectObject(carHolder, true).length) honk();
+}
+
+document.getElementById('go')!.addEventListener('pointerdown', () => vroom());
+document.getElementById('horn')!.addEventListener('pointerdown', () => honk());
 view.addEventListener('pointercancel', up);
 view.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -173,7 +330,7 @@ function renderTabs() {
     b.className = 'tab' + (t === tab ? ' on' : '');
     b.style.background = tabInfo[t].color;
     b.textContent = tabInfo[t].icon;
-    b.onpointerdown = () => { tab = t; renderTabs(); renderCards(); cards.scrollLeft = 0; };
+    b.onpointerdown = () => { tab = t; play('pop'); renderTabs(); renderCards(); cards.scrollLeft = 0; };
     tabs.append(b);
   }
 }
@@ -301,6 +458,8 @@ function addonThumb(slot: typeof slots[number], id: string): string {
 autoUpdate(() => (touching ? performance.now() : lastTouch));
 renderWheelThumbs();
 renderTabs();
+// `?go=<ms>` starts a lap automatically (for checking the drive without touching the screen).
+if (q.has('go')) setTimeout(vroom, Number(q.get('go')) || 500);
 renderCards();
 
 // MARK: Frame loop
@@ -326,12 +485,13 @@ let frames = 0, fpsT = 0;
 // only 30 while nothing is being touched and the car is just swaying.
 let lastDraw = 0;
 renderer.setAnimationLoop((now) => {
-  const idle = !touching && !fling && now - popT0 > 400 && now - hopT0 > 600;
-  if (now - lastDraw < (idle ? 31 : 15.5)) return;
+  const busy = tickAnims(now) || driving || touching || !!fling;
+  if (now - lastDraw < (busy ? 15.5 : 31)) return;
+  tickBursts(now, Math.min(0.05, (now - lastDraw) / 1000));
   lastDraw = now;
   materials.tick(now);
   if (fpsEl && ++frames && now - fpsT > 1000) { fpsEl.textContent = `${Math.round((frames * 1000) / (now - fpsT))} fps · ${renderer.info.render.calls} calls · ${Math.round(renderer.info.render.triangles / 1000)}k tris`; frames = 0; fpsT = now; }
-  camera.position.z += (cameraDistance - camera.position.z) * 0.25;
+  if (!driving) camera.position.z += (cameraDistance - camera.position.z) * 0.2;
 
   if (fling) {
     const t = Math.min(1, (now - fling.t0) / 700);
@@ -339,7 +499,7 @@ renderer.setAnimationLoop((now) => {
     if (t >= 1) fling = null;
   }
   // Gently sway around a three-quarter front view so the driver and headlights face the kid.
-  if (!touching && now > resumeAt) {
+  if (!touching && !driving && now > resumeAt) {
     if (!sway || now - sway.t0 > 4500) {
       const to = sway && sway.to > 0 ? -0.28 : 0.22;
       sway = { from: autoSpin.rotation.y, to, t0: now };
@@ -349,11 +509,6 @@ renderer.setAnimationLoop((now) => {
   }
 
   if (car) {
-    // Pop in when parts change, and a happy hop when the paint changes.
-    const p = Math.min(1, (now - popT0) / 350);
-    car.root.scale.setScalar(p < 1 ? 0.85 + 0.15 * Math.sin(p * Math.PI * 0.5) + 0.06 * Math.sin(p * Math.PI) : 1);
-    const h = (now - hopT0) / 520;
-    car.body.position.y = car.body.userData.baseY + (h < 1 ? Math.abs(Math.sin(h * Math.PI * 2)) * 0.12 : 0);
     for (const t of car.tickers) t(now);
     const head = car.driver.getObjectByName('head');
     if (head) head.position.y = 0.66 + 0.01 * Math.max(0, Math.sin(now / 190));

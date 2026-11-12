@@ -24,3 +24,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1f1f1f; tou
 .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .card.none { font-size: 54px; color: #8e8e93; font-weight: 900; }
 .swatch { width: 84px; height: 84px; border-radius: 50%; box-shadow: inset 0 -8px 14px rgba(0,0,0,0.35), inset 0 6px 10px rgba(255,255,255,0.45); }
+
+/* GO and horn, top right like the native app. */
+#actions { position: fixed; top: calc(18px + env(safe-area-inset-top)); right: 22px; display: flex; flex-direction: column; gap: 18px; align-items: center; }
+#go, #horn { border-radius: 50%; display: grid; place-items: center; color: white; font-weight: 900;
+  box-shadow: 0 7px 14px rgba(0,0,0,0.45), inset 0 -8px 12px rgba(0,0,0,0.22), inset 0 6px 10px rgba(255,255,255,0.4); }
+#go { width: 112px; height: 112px; background: #2bbd4a; font-size: 44px; letter-spacing: 1px; text-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+#horn { width: 84px; height: 84px; background: #ffc61a; font-size: 38px; }
+#go:active, #horn:active { transform: scale(0.92); }

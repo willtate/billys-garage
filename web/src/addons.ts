@@ -21,7 +21,7 @@ const lit = (color: number, emissive: number, intensity = 1.6) =>
 function part(parts: O[], anim: O[] = []): THREE.Group {
   const g = group(parts, 'addon');
   mergeStatic(g);
-  g.add(...anim);
+  if (anim.length) g.add(...anim);
   return g;
 }
 
