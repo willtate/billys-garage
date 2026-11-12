@@ -2,7 +2,7 @@
 // files to download. Browsers only allow sound after the first touch, so `unlock` must be called
 // from a touch handler.
 
-export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray';
+export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee';
 
 const SR = 44100;
 const TAU = Math.PI * 2;
@@ -110,6 +110,17 @@ const recipes: Record<Effect, () => AudioBuffer> = {
       const x = noise();
       lo += 0.3 * (x - lo);
       d[i] = (x - lo) * 0.32 * Math.min(1, t / 0.08) * Math.min(1, (1.6 - t) / 0.3);
+    }
+  }),
+  // Off the ramp: a slide whistle swooping up and back down.
+  whee: () => make(0.9, (d, n) => {
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const sweep = t < 0.45 ? t / 0.45 : 1 - (t - 0.45) / 0.45 * 0.7;
+      const f = (520 + 900 * sweep) * (1 + 0.025 * Math.sin(TAU * 7 * t));
+      ph += (TAU * f) / SR;
+      d[i] = (Math.sin(ph) + 0.15 * Math.sin(2 * ph)) * 0.32 * Math.min(1, t / 0.03) * Math.min(1, (0.9 - t) / 0.12);
     }
   }),
   vroom: () => make(4.7, (d, n) => {

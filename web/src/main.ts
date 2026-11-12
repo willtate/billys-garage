@@ -10,6 +10,7 @@ import { autoUpdate } from './update';
 import { animate, burst, easeIn, easeOut, smooth, tickAnims, tickBursts } from './fx';
 import { play, unlock } from './sound';
 import { carWash } from './wash';
+import { makeRamp, RAMP_H, RAMP_LEN } from './ramp';
 import { ROAD_RADIUS } from './garage';
 
 // MARK: Renderer and scene
@@ -143,6 +144,10 @@ function popIn(o: THREE.Object3D, delay: number) {
   animate(delay + 180, 140, (u) => o.scale.setScalar(1.18 - 0.18 * smooth(u)));
 }
 
+function popOut(o: THREE.Object3D) {
+  animate(0, 250, (u) => o.scale.setScalar(Math.max(0.01, 1 - easeIn(u))), () => o.removeFromParent());
+}
+
 function dropIn(o: THREE.Object3D, height: number) {
   const base = o.position.y;
   o.position.y = base + height;
@@ -200,7 +205,7 @@ function exhaust() {
   }
 }
 
-const LAP = 4200;
+const LAP = 5200;
 function wash() {
   if (driving || washing || !car) return;
   washing = true;
@@ -223,19 +228,74 @@ function vroom() {
   animate(0, 150, (u) => { carHolder.rotation.z = 0.06 * smooth(u); });
   animate(150, 150, (u) => { carHolder.rotation.z = 0.06 * (1 - smooth(u)); }, exhaust);
   const R = ROAD_RADIUS, total = R * 2 + 2 * Math.PI * R;
+
+  // A jump ramp pops up on the far side of the track (the near side is behind the parts tray),
+  // so the jump is seen side-on.
+  const cam = camera.getWorldPosition(new THREE.Vector3());
+  const toward = userSpin.worldToLocal(new THREE.Vector3(-cam.x, 0, -cam.z).setLength(R));
+  let thR = Math.atan2(-toward.z, toward.x);
+  if (thR < 0) thR += 2 * Math.PI;
+  thR = THREE.MathUtils.clamp(thR, 0.9, 2 * Math.PI - 1.4);
+  const ramp = makeRamp();
+  ramp.position.set(R * Math.cos(thR), -0.25, -R * Math.sin(thR));
+  ramp.rotation.y = thR + Math.PI / 2;
+  userSpin.add(ramp);
+  popIn(ramp, 0);
+
+  // Rockets and big wheels make for bigger jumps.
+  let jump = 1;
+  if (design.back === 'rockets') jump *= 1.5;
+  if (design.wheels === 'offroad' || design.body === 'monster') jump *= 1.2;
+  jump = Math.min(jump, design.body === 'monster' ? 1.25 : 1.5); // keep tall trucks in the picture
+  const sRamp = R + R * thR, sLip = sRamp + RAMP_LEN, flight = 3.8 * jump, sLand = sLip + flight, peak = 1.35 * jump;
+  let phase = 0; // 0 before ramp, 1 in the air, 2 landed
+
+  // Distance along the lap over time: pull away gently, cruise, go slow-motion over the jump so
+  // it can be seen, and ease in at the end. Precomputed by stepping the speed along the route.
+  const speed = (d: number) => (0.2 + 0.8 * smooth(d / 4) * smooth((total - d) / 4))
+    * (1 - 0.68 * smooth((d - (sLip - 0.6)) / 0.6) * (1 - smooth((d - sLand + 0.2) / 0.5)));
+  const route: number[] = [0];
+  for (let d = 0; d < total; ) { d = Math.min(total, d + speed(d) * 0.01); route.push(d); }
+  const along = (u: number) => {
+    const f = u * (route.length - 1), i = Math.min(route.length - 2, Math.floor(f));
+    return route[i] + (route[i + 1] - route[i]) * (f - i);
+  };
+
+  carHolder.rotation.order = 'YXZ'; // yaw first, so x/z rotations roll and pitch the car itself
   animate(300, LAP, (u) => {
-    const s = smooth(u) * total;
+    const s = along(u);
     let x: number, z: number, yaw: number;
     if (s < R) { x = s; z = 0; yaw = (Math.PI / 2) * smooth((s - 0.55 * R) / (0.45 * R)); }
     else if (s < R + 2 * Math.PI * R) { const th = (s - R) / R; x = R * Math.cos(th); z = -R * Math.sin(th); yaw = th + Math.PI / 2; }
     else { const d = s - R - 2 * Math.PI * R; x = R - d; z = 0; yaw = 2.5 * Math.PI + (Math.PI / 2) * smooth(d / (0.45 * R)); }
     const r = Math.hypot(x, z);
-    carHolder.position.set(x, -0.25 * smooth((r - 3.4) / 0.5), z);
-    carHolder.rotation.y = yaw;
+    let y = -0.25 * smooth((r - 3.4) / 0.5), pitch = 0, roll = 0;
+    if (s >= sRamp && s < sLip) {
+      // Up the ramp, nose raised.
+      y += RAMP_H * ((s - sRamp) / RAMP_LEN);
+      pitch = Math.atan(RAMP_H / RAMP_LEN);
+    } else if (s >= sLip && s < sLand) {
+      // In the air: an arc from the lip down to the road, with a barrel roll.
+      const t = (s - sLip) / flight;
+      y += RAMP_H * (1 - t) + 4 * peak * t * (1 - t);
+      pitch = Math.atan(RAMP_H / RAMP_LEN) * (1 - 2 * t) * 0.8;
+      roll = 2 * Math.PI * smooth((t - 0.1) / 0.75);
+      if (phase === 0) { phase = 1; play('whee'); }
+    } else if (s >= sLand && phase === 1) {
+      phase = 2;
+      play('clunk');
+      squash();
+      burst(userSpin, { at: new THREE.Vector3(x, -0.15, z), count: 24, color: new THREE.Color(0xb3a596), speed: 2, spread: 0.6,
+        dir: new THREE.Vector3(0, 1, 0), size: 0.3, life: 700, gravity: -4, grow: 2.5, opacity: 0.7 });
+    }
+    carHolder.position.set(x, y, z);
+    carHolder.rotation.set(roll, yaw, pitch);
   }, () => {
+    popOut(ramp);
     const y0 = carHolder.rotation.y;
     animate(0, 450, (u) => { carHolder.rotation.y = y0 + Math.PI * easeOut(u); }, () => {
       carHolder.rotation.set(0, 0, 0);
+      carHolder.rotation.order = 'XYZ';
       carHolder.position.set(0, 0, 0);
       driving = false;
       hop();
