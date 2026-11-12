@@ -10,6 +10,7 @@ import { autoUpdate } from './update';
 import { animate, burst, easeIn, easeOut, smooth, tickAnims, tickBursts } from './fx';
 import { play, unlock } from './sound';
 import { carWash } from './wash';
+import { Mud } from './mud';
 import { makeRamp, RAMP_H, RAMP_LEN } from './ramp';
 import { ROAD_RADIUS } from './garage';
 
@@ -79,6 +80,7 @@ let design: Design = { body: 'muscle', wheels: 'alloy', paint: 'blue', sticker: 
 for (const k of ['body', 'wheels', 'paint', 'sticker', ...slots] as const) { const v = q.get(k); if (v) design[k] = v; }
 let car: BuiltCar | null = null;
 let driving = false, washing = false;
+let mud: Mud | null = null; // made once the car exists
 
 function swapCar(): BuiltCar {
   if (car) carHolder.remove(car.root);
@@ -103,6 +105,8 @@ function apply(next: Design) {
   design = next;
   localStorage.setItem('vroom.design', JSON.stringify(design));
   const slot = slots.find((k) => prev[k] !== next[k]);
+  // A new body or wheels changes the car's shape, so the old mud would float in mid-air.
+  if (prev.body !== next.body || prev.wheels !== next.wheels) mud?.clear();
   if (prev.body !== next.body) {
     const c = swapCar();
     dropIn(c.body, 2.6);
@@ -211,10 +215,18 @@ function wash() {
   washing = true;
   document.body.classList.add('washing');
   carWash(carHolder, car.root, car.body, car.driver, materials, () => {
+    mud?.clear();
     washing = false;
     document.body.classList.remove('washing');
     hop();
-  });
+  }, mud && mud.level ? mud : undefined);
+}
+
+function muddy() {
+  if (driving || washing || !car) return;
+  mud ??= new Mud(carHolder, materials);
+  mud.splat(car.body);
+  if (car) cheer(car.driver);
 }
 
 function vroom() {
@@ -374,6 +386,7 @@ function tapped(e: PointerEvent) {
 document.getElementById('go')!.addEventListener('pointerdown', () => vroom());
 document.getElementById('horn')!.addEventListener('pointerdown', () => honk());
 document.getElementById('wash')!.addEventListener('pointerdown', () => wash());
+document.getElementById('mud')!.addEventListener('pointerdown', () => muddy());
 view.addEventListener('pointercancel', up);
 view.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -609,6 +622,7 @@ if (import.meta.env.DEV && q.has('at')) {
   {
     const t0 = performance.now();
     drawFrame(t0);
+    for (let i = 0; i < Number(q.get('mudnow') ?? 0); i++) muddy();
     if (q.has('washnow')) wash();
     if (q.has('gonow')) vroom();
     for (let t = t0; t <= t0 + until; t += 16.7) { lastDraw = -1e9; drawFrame(t); }

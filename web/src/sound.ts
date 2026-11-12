@@ -2,7 +2,7 @@
 // files to download. Browsers only allow sound after the first touch, so `unlock` must be called
 // from a touch handler.
 
-export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee';
+export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee' | 'splat';
 
 const SR = 44100;
 const TAU = Math.PI * 2;
@@ -121,6 +121,24 @@ const recipes: Record<Effect, () => AudioBuffer> = {
       const f = (520 + 900 * sweep) * (1 + 0.025 * Math.sin(TAU * 7 * t));
       ph += (TAU * f) / SR;
       d[i] = (Math.sin(ph) + 0.15 * Math.sin(2 * ph)) * 0.32 * Math.min(1, t / 0.03) * Math.min(1, (0.9 - t) / 0.12);
+    }
+  }),
+  // Mud: a few wet squelchy splats.
+  splat: () => make(0.7, (d, n) => {
+    const noise = lcg(555);
+    const hits = [0, 0.11, 0.2, 0.34];
+    let lo = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      lo += 0.12 * (noise() - lo);
+      let s = 0;
+      for (const [k, t0] of hits.entries()) {
+        const dt = t - t0;
+        if (dt < 0) continue;
+        const env = Math.exp(-dt * 22) * Math.min(1, dt / 0.003);
+        s += (lo * 3 + Math.sin(TAU * (90 + 25 * k) * dt * (1 - dt * 2))) * env * (1 - k * 0.15);
+      }
+      d[i] = Math.tanh(s * 1.4) * 0.45;
     }
   }),
   vroom: () => make(4.7, (d, n) => {

@@ -25,8 +25,12 @@ function localBox(obj: THREE.Object3D, ref: THREE.Object3D): THREE.Box3 {
   return out;
 }
 
-/** Points scattered over the car's paint and glass, in holder space, ordered front to back. */
-function foamSpots(body: THREE.Object3D, holder: THREE.Object3D, m: CarMaterials): { p: THREE.Vector3; n: THREE.Vector3 }[] {
+export interface Spot { p: THREE.Vector3; n: THREE.Vector3 }
+
+/** Points scattered over the car's paint and glass, in holder space, ordered front to back.
+ *  `keep` can turn down spots (e.g. favour the lower body for mud). */
+export function surfaceSpots(body: THREE.Object3D, holder: THREE.Object3D, m: CarMaterials, total = FOAM,
+  keep: (s: Spot) => boolean = () => true): Spot[] {
   const inv = holder.matrixWorld.clone().invert();
   const meshes: { mesh: THREE.Mesh; area: number }[] = [];
   body.traverse((o) => {
@@ -37,20 +41,22 @@ function foamSpots(body: THREE.Object3D, holder: THREE.Object3D, m: CarMaterials
     const s = o.geometry.boundingBox!.getSize(new THREE.Vector3());
     meshes.push({ mesh: o, area: s.x * s.y + s.x * s.z + s.y * s.z });
   });
-  const total = meshes.reduce((a, b) => a + b.area, 0);
-  const out: { p: THREE.Vector3; n: THREE.Vector3 }[] = [];
+  const areaSum = meshes.reduce((a, b) => a + b.area, 0);
+  const out: Spot[] = [];
   for (const { mesh, area } of meshes) {
     const sampler = new MeshSurfaceSampler(mesh).build();
-    const count = Math.round((FOAM * area) / total);
+    const count = Math.round((total * area) / areaSum);
     const mw = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld);
     const nm = new THREE.Matrix3().getNormalMatrix(mw);
-    for (let i = 0; i < count; i++) {
+    for (let i = 0, tries = 0; i < count && tries < count * 20; tries++) {
       const p = new THREE.Vector3(), n = new THREE.Vector3();
       sampler.sample(p, n);
       p.applyMatrix4(mw);
       n.applyMatrix3(nm).normalize();
-      if (n.y < -0.4) { i--; continue; } // nobody sees foam on the underside
+      if (n.y < -0.4) continue; // nobody sees the underside
+      if (!keep({ p, n })) continue;
       out.push({ p, n });
+      i++;
     }
   }
   return out.sort((a, b) => b.p.x - a.p.x);
@@ -68,7 +74,8 @@ const bristles = (a: string, b: string) => {
   return new THREE.MeshStandardMaterial({ map: t, roughness: 0.95 });
 };
 
-export function carWash(holder: THREE.Group, root: THREE.Object3D, body: THREE.Object3D, driver: THREE.Object3D, m: CarMaterials, done: () => void) {
+export function carWash(holder: THREE.Group, root: THREE.Object3D, body: THREE.Object3D, driver: THREE.Object3D, m: CarMaterials,
+  done: () => void, mud?: { rinse: (gx: number) => void; scrub: (u: number) => void }) {
   const bb = localBox(root, holder);
   const front = bb.max.x + 0.9, rear = bb.min.x - 0.9;
   const halfZ = Math.max(Math.abs(bb.min.z), bb.max.z) + 0.35;
@@ -96,7 +103,7 @@ export function carWash(holder: THREE.Group, root: THREE.Object3D, body: THREE.O
   holder.add(gantry);
 
   // Foam: one instanced mesh of little bubbles stuck to the car.
-  const spots = foamSpots(body, holder, m);
+  const spots = surfaceSpots(body, holder, m);
   const foamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, transparent: true, opacity: 0.95 });
   const foam = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), foamMat, spots.length);
   const sizes = spots.map(() => 0.06 + Math.random() * 0.08);
@@ -152,6 +159,7 @@ export function carWash(holder: THREE.Group, root: THREE.Object3D, body: THREE.O
     brushR.position.z = -halfZ + 0.05 + inCar * 0.1;
     body.rotation.x = Math.sin(u * 60) * 0.015 * inCar;
     setFoam((i) => 1 + 0.25 * Math.sin(u * 30 + i));
+    mud?.scrub(u);
   }, () => { body.rotation.x = 0; });
   animate(b0 + BRUSH_T - 250, 250, (u) => brushes.forEach((b) => b.scale.setScalar(1 - 0.99 * u)));
 
@@ -163,6 +171,7 @@ export function carWash(holder: THREE.Group, root: THREE.Object3D, body: THREE.O
     const gx = at(u);
     gantry.position.x = gx;
     setFoam((i) => 1 - reached(spots[i].p.x, gx));
+    mud?.rinse(gx);
     if (u - lastDrop > 0.02) {
       lastDrop = u;
       burst(holder, { at: new THREE.Vector3(gx, top + 0.15, 0), count: 22, color: new THREE.Color(0x4fb8ff), speed: 2.5,

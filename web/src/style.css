@@ -38,3 +38,6 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1f1f1f; tou
 /* While the car is in the wash, the tray dims so it's clear parts wait. */
 body.washing #tray { opacity: 0.45; transition: opacity 0.3s; }
 #tray { transition: opacity 0.3s; }
+#mud { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; font-size: 40px; background: #8a5a2e;
+  box-shadow: 0 7px 14px rgba(0,0,0,0.45), inset 0 -8px 12px rgba(0,0,0,0.22), inset 0 6px 10px rgba(255,255,255,0.3); }
+#mud:active { transform: scale(0.92); }
