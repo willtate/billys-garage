@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, canvas, capsule, cyl, extrude, group, Outline, sideOutline, sphere, torus, tracePath, tumblehome, Vec } from './geom';
+import { box, canvas, capsule, cyl, extrude, group, Outline, rod, sideOutline, sphere, torus, tracePath, tumblehome, Vec } from './geom';
 import { Loft, LoftSpec } from './loft';
 import { CarMaterials } from './materials';
 
@@ -11,8 +11,14 @@ export interface BodyBuild {
   panel: Outline;
   /** Racing stripe runs along the top centre line. */
   stripes: [number, number][][];
-  loft: Loft;
+  /** The rounded skin, when the body has one (side stickers wrap onto it). */
+  loft?: Loft;
 }
+
+/** A spot on the body where an add-on bolts on, and how much room there is across the car. */
+export interface Anchor { x: number; y: number; w: number }
+const A = (x: number, y: number, w: number): Anchor => ({ x, y, w });
+export type Slot = 'engine' | 'front' | 'roof' | 'back';
 
 export interface BodyStyle {
   id: string;
@@ -24,7 +30,12 @@ export interface BodyStyle {
   wheelWidth: number;
   seat: Vec;
   driverScale: number;
+  hood: Anchor; nose: Anchor; roof: Anchor; deck: Anchor; tail: Anchor;
   build: (m: CarMaterials, wheelR: number) => BodyBuild;
+}
+
+export function anchor(b: BodyStyle, slot: Slot): Anchor {
+  return slot === 'engine' ? b.hood : slot === 'front' ? b.nose : slot === 'roof' ? b.roof : b.deck;
 }
 
 // MARK: - Shared pieces
@@ -163,10 +174,36 @@ const P = {
     ];
   },
 
-  /** A tail lamp: dark housing, glowing core and a deep red cover. Faces -X. */
-  tailLamp(m: CarMaterials, x: number, y: number, z: number, h: number, w: number): O[] {
+  /** A modern lamp cluster: black housing, chrome reflector, twin projectors under a clear cover. Faces +X. */
+  rectLamp(m: CarMaterials, x: number, y: number, z: number, h: number, w: number, tilt = 0, drl = true): O {
     const r = Math.min(h, w);
-    return [
+    const parts: O[] = [box(m.grille, 0.06, h + 0.02, w + 0.02, r * 0.3, [-0.04, 0, 0]),
+      box(m.reflector, 0.02, h * 0.82, w * 0.92, r * 0.25, [0, 0, 0])];
+    for (const t of [-0.24, 0.2]) {
+      parts.push(torus(m.chrome, h * 0.3, h * 0.05, 'x', [0.015, 0, t * w]));
+      parts.push(sphere(m.headlight, h * 0.26, [0.02, 0, t * w], [0.5, 1, 1]));
+    }
+    if (drl) parts.push(box(m.headlight, 0.012, 0.02, w * 0.8, 0.008, [0.02, -h * 0.36, 0]));
+    parts.push(box(m.lens, 0.02, h + 0.01, w + 0.01, r * 0.3, [0.035, 0, 0]));
+    const n = group(parts);
+    n.position.set(x, y, z);
+    n.rotation.z = tilt;
+    return n;
+  },
+
+  /** A wing with a rounded, teardrop profile (front toward +X), spanning Z. */
+  airfoil(mat: THREE.Material, chord: number, thickness: number, span: number, at: Vec): O {
+    const p = new Outline().move(chord / 2, 0).q(-chord / 2, thickness * 0.15, chord * 0.2, thickness * 1.2).q(chord / 2, 0, 0, -thickness * 0.4).close();
+    const n = extrude(p.shape, span, 0.015, mat);
+    n.position.set(...at);
+    return n;
+  },
+
+  /** A tail lamp: dark housing, glowing core and a deep red cover. Faces -X. */
+  tailLamp(m: CarMaterials, x: number, y: number, z: number, h: number, w: number, rings = false): O[] {
+    const r = Math.min(h, w);
+    const ring = rings ? [torus(m.chrome, r * 0.38, 0.008, 'x', [x - 0.03, y, z])] : [];
+    return [...ring,
       box(m.grille, 0.05, h + 0.02, w + 0.02, r * 0.25, [x + 0.02, y, z]),
       box(m.taillight, 0.02, h * 0.55, w * 0.85, r * 0.2, [x - 0.005, y, z]),
       box(m.tailLens, 0.03, h, w, r * 0.25, [x - 0.015, y, z]),
@@ -216,6 +253,7 @@ export function makeDriver(m: CarMaterials): THREE.Group {
 export const muscle: BodyStyle = {
   id: 'muscle', wheelRadius: 0.38, wheelbase: 2.7, track: 1.38, wheelWidth: 0.4,
   seat: [-0.3, 0.68, 0.3], driverScale: 0.82,
+  hood: A(1.3, 0.96, 0.9), nose: A(2.2, 0.42, 1.6), roof: A(-0.25, 1.49, 1.3), deck: A(-1.95, 0.97, 1.5), tail: A(-2.2, 0.32, 1.4),
   build(m, R) {
     const halfW = 0.86;
     const wellR = Math.min(R + 0.07, 0.54);
@@ -260,3 +298,213 @@ export function stripes(b: BodyBuild, m: CarMaterials): O[] {
   }
   return out;
 }
+
+export const sports: BodyStyle = {
+  id: 'sports', wheelRadius: 0.37, wheelbase: 2.65, track: 1.48, wheelWidth: 0.44,
+  seat: [-0.3, 0.48, 0.28], driverScale: 0.78,
+  hood: A(1.2, 0.9, 0.8), nose: A(2.25, 0.32, 1.6), roof: A(-0.3, 1.3, 1.2), deck: A(-1.85, 0.91, 1.6), tail: A(-2.22, 0.3, 1.4),
+  build(m, R) {
+    const halfW = 0.92;
+    const wellR = Math.min(R + 0.07, 0.48);
+    const path = sideOutline(2.18, -2.15, 0.3, [1.325, -1.325], 0.37, wellR, (p) => {
+      p.l(-2.2, 0.36).l(-2.22, 0.78).q(-2.05, 0.9, -2.21, 0.88).l(0.6, 0.92)
+        .q(1.8, 0.86, 1.25, 0.94).q(2.25, 0.42, 2.15, 0.76).l(2.24, 0.36).l(2.19, 0.3);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 0.6, topExp: 2.6, lowExp: 3.5, cornerF: 0.32, cornerR: 0.25, flare: 0.045, wells: [1.325, -1.325], wellR });
+    const parts: O[] = [loft.mesh, P.panelLines(loft, [0.75, -0.62], 0.28, 0.95)];
+    parts.push(...P.greenhouse(m, [-1.35, 0.91], [-0.55, 1.26], [-0.05, 1.27], [0.85, 0.9], 1.36, [], 0.06, 0.14, 0.45));
+    for (const s of [1, -1]) {
+      parts.push(P.rectLamp(m, 2.0, loft.topY(2.0, 0.52) - 0.005, s * 0.52, 0.14, 0.46, 0.95));
+      parts.push(box(m.grille, 0.04, 0.13, 0.34, 0.04, [2.21, 0.4, s * 0.55]));
+      parts.push(box(m.amber, 0.03, 0.04, 0.2, 0.014, [2.215, 0.5, s * 0.6]));
+    }
+    parts.push(box(m.grille, 0.05, 0.13, 0.74, 0.024, [2.22, 0.33, 0]), box(m.chrome, 0.06, 0.015, 0.7, 0, [2.235, 0.33, 0]));
+    parts.push(...P.tailLamp(m, -2.215, 0.76, 0, 0.07, 1.36));
+    parts.push(box(m.grille, 0.14, 0.12, 1.4, 0.03, [-2.17, 0.25, 0]));
+    parts.push(...P.exhaust(m, -2.24, 0.34, [0.12, -0.12, 0.27, -0.27], 0.045));
+    parts.push(...P.plate(m, -2.22, 0.52, -1), ...P.handles(m, loft, [[-0.45, 0.78]]), ...P.mirrors(m, 0.72, 0.97, 0.74));
+    return {
+      node: group(parts, 'body'), panel: path, loft,
+      stripes: [[[0.9, 0.925], [1.4, 0.915], [1.8, 0.865], [2.09, 0.705]], [[-0.55, 1.3], [-0.05, 1.31]], [[-2.05, 0.905], [-1.38, 0.91]]],
+    };
+  },
+};
+
+export const formula: BodyStyle = {
+  id: 'formula', wheelRadius: 0.4, wheelbase: 2.9, track: 1.72, wheelWidth: 0.46,
+  seat: [0, 0.3, 0], driverScale: 0.85,
+  hood: A(-1.25, 0.86, 0.5), nose: A(2.72, 0.22, 1.0), roof: A(-0.62, 1.1, 0.4), deck: A(-1.95, 1.12, 1.3), tail: A(-2.0, 0.32, 0.6),
+  build(m) {
+    const tub = sideOutline(2.6, -1.95, 0.12, [], 0, 0, (p) => {
+      p.l(-2.0, 0.5).q(-1.65, 0.78, -1.98, 0.74).l(-0.75, 1.02).q(-0.5, 1.08, -0.65, 1.1)
+        .l(-0.46, 0.74).l(0.5, 0.7).l(0.75, 0.72).q(2.55, 0.36, 1.6, 0.62).q(2.68, 0.2, 2.7, 0.3).l(2.6, 0.12);
+    });
+    const pod = new Outline().move(0.55, 0.18).l(0.55, 0.52).q(0.3, 0.62, 0.5, 0.62).l(-1.0, 0.62).q(-1.45, 0.4, -1.3, 0.6).l(-1.45, 0.18).close();
+    const parts: O[] = [extrude(tub.shape, 0.66, 0.12, m.paint), extrude(pod.shape, 1.24, 0.1, m.paint)];
+    for (const s of [1, -1]) {
+      parts.push(box(m.grille, 0.03, 0.28, 0.2, 0.014, [0.565, 0.4, s * 0.45]));
+      for (const x of [1.45, -1.45]) {
+        parts.push(rod(m.trim, [x + 0.18, 0.32, s * 0.3], [x, 0.36, s * 0.7], 0.025));
+        parts.push(rod(m.trim, [x - 0.18, 0.48, s * 0.3], [x, 0.46, s * 0.7], 0.025));
+      }
+    }
+    parts.push(P.airfoil(m.paint, 0.5, 0.07, 2.0, [2.45, 0.16, 0]), P.airfoil(m.trim, 0.3, 0.05, 1.9, [2.25, 0.26, 0]));
+    parts.push(P.airfoil(m.paint, 0.55, 0.1, 1.3, [-1.95, 1.05, 0]), P.airfoil(m.trim, 0.35, 0.06, 1.3, [-2.05, 0.9, 0]));
+    for (const s of [1, -1]) {
+      parts.push(box(m.trim, 0.55, 0.22, 0.03, 0.01, [2.45, 0.22, s * 1.0]), box(m.trim, 0.62, 0.42, 0.03, 0.01, [-1.98, 0.95, s * 0.66]));
+    }
+    parts.push(box(m.trim, 0.1, 0.42, 0.06, 0.02, [-1.9, 0.75, 0]), box(m.taillight, 0.03, 0.08, 0.12, 0.01, [-2.02, 0.42, 0]));
+    const halo = torus(m.trim, 0.32, 0.03, 'y', [0.05, 0.98, 0]);
+    halo.scale.set(1.2, 1, 0.9);
+    parts.push(halo, rod(m.trim, [0.43, 0.98, 0], [0.62, 0.72, 0], 0.03));
+    return { node: group(parts, 'body'), panel: pod, stripes: [] };
+  },
+};
+
+export const pickup: BodyStyle = {
+  id: 'pickup', wheelRadius: 0.44, wheelbase: 3.0, track: 1.46, wheelWidth: 0.44,
+  seat: [-0.05, 0.98, 0.3], driverScale: 0.9,
+  hood: A(1.55, 1.2, 1.0), nose: A(2.55, 0.62, 1.8), roof: A(-0.27, 1.9, 1.4), deck: A(-2.2, 1.24, 1.7), tail: A(-2.4, 0.45, 1.6),
+  build(m, R) {
+    const halfW = 0.93;
+    const wellR = Math.min(R + 0.08, 0.7);
+    const path = sideOutline(2.42, -2.35, 0.47, [1.5, -1.5], 0.44, wellR, (p) => {
+      p.l(-2.38, 0.5).l(-2.38, 1.2).l(-2.33, 1.22).l(0.75, 1.22).q(2.35, 1.12, 1.7, 1.22).q(2.5, 0.92, 2.48, 1.08).l(2.5, 0.52).l(2.43, 0.47);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 1.0, topExp: 5, lowExp: 6, cornerF: 0.15, cornerR: 0.08, flare: 0.02, wells: [1.5, -1.5], wellR });
+    const parts: O[] = [loft.mesh, P.panelLines(loft, [0.8, -0.8, -0.84], 0.45, 1.3)];
+    parts.push(...P.greenhouse(m, [-0.82, 1.21], [-0.76, 1.86], [0.22, 1.86], [0.82, 1.21], 1.62, [-0.28]));
+    parts.push(box(m.plastic, 1.42, 0.02, 1.5, 0.009, [-1.58, loft.topY(-1.58, 0) - 0.004, 0]));
+    for (const s of [1, -1]) parts.push(box(m.trim, 1.5, 0.035, 0.07, 0.015, [-1.58, loft.topY(-1.58, 0.8) + 0.012, s * 0.8]));
+    parts.push(...P.grille(m, 2.49, 0.86, 0.38, 0.88, 4));
+    for (const s of [1, -1]) {
+      parts.push(P.rectLamp(m, 2.47, 0.92, s * 0.62, 0.18, 0.28));
+      parts.push(...P.tailLamp(m, -2.385, 0.95, s * 0.76, 0.35, 0.14));
+      parts.push(box(m.trim, 1.25, 0.05, 0.22, 0.02, [0, 0.42, s * 0.98]));
+    }
+    parts.push(box(m.chrome, 0.18, 0.2, 1.9, 0.08, [2.52, 0.5, 0]), box(m.chrome, 0.16, 0.18, 1.88, 0.07, [-2.4, 0.5, 0]));
+    parts.push(capsule(m.chrome, 0.02, 0.2, 'z', [-2.39, 1.12, 0]));
+    parts.push(...P.plate(m, -2.4, 0.72, -1), ...P.handles(m, loft, [[-0.62, 1.1]]), ...P.mirrors(m, 0.78, 1.3, 0.87));
+    parts.push(...P.exhaust(m, -2.42, 0.4, [-0.6]), ...P.flankMarkers(m, loft, 2.25, -2.2, 0.95));
+    return {
+      node: group(parts, 'body'), panel: path, loft,
+      stripes: [[[0.8, 1.225], [1.625, 1.2], [2.3, 1.13]], [[-0.76, 1.895], [0.22, 1.895]]],
+    };
+  },
+};
+
+export const offroad: BodyStyle = {
+  id: 'offroad', wheelRadius: 0.46, wheelbase: 2.55, track: 1.42, wheelWidth: 0.46,
+  seat: [0, 1.03, 0.32], driverScale: 0.92,
+  hood: A(1.35, 1.28, 1.1), nose: A(2.15, 0.6, 1.9), roof: A(-0.77, 1.98, 1.45), deck: A(-1.85, 1.98, 1.5), tail: A(-2.12, 0.55, 1.6),
+  build(m, R) {
+    const halfW = 0.9;
+    const wellR = Math.min(R + 0.08, 0.74);
+    const path = sideOutline(2.05, -2.05, 0.5, [1.275, -1.275], 0.46, wellR, (p) => {
+      p.l(-2.08, 1.26).l(-2.04, 1.29).l(0.7, 1.29).l(1.98, 1.25).q(2.08, 1.15, 2.07, 1.25).l(2.09, 0.55).l(2.05, 0.5);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 1.0, topExp: 7, lowExp: 7, cornerF: 0.1, cornerR: 0.1, wells: [1.275, -1.275], wellR });
+    const parts: O[] = [loft.mesh, P.panelLines(loft, [0.78, -0.35, -1.25], 0.55, 1.32)];
+    parts.push(...P.greenhouse(m, [-2.0, 1.28], [-1.96, 1.94], [0.42, 1.94], [0.78, 1.28], 1.64, [-0.35, -1.25]));
+    // Black fender flares round each wheel.
+    for (const x of [1.275, -1.275]) {
+      const a0 = Math.asin((0.5 - 0.46) / wellR);
+      const arc = new THREE.Shape();
+      arc.absarc(x, 0.46, wellR + 0.13, a0, Math.PI - a0, false);
+      arc.absarc(x, 0.46, wellR, Math.PI - a0, a0, true);
+      arc.closePath();
+      for (const s of [1, -1]) {
+        const f = extrude(arc, 0.14, 0.04, m.plastic);
+        f.position.z = s * halfW;
+        parts.push(f);
+      }
+    }
+    for (const s of [1, -1]) {
+      parts.push(...P.headlamp(m, 2.08, 1.0, s * 0.62, 0.13));
+      parts.push(...P.tailLamp(m, -2.085, 1.05, s * 0.74, 0.16, 0.16, true));
+      parts.push(rod(m.trim, [-0.8, 0.5, s * 1.0], [0.75, 0.5, s * 1.0], 0.045));
+    }
+    for (let i = 0; i < 7; i++) parts.push(box(m.grille, 0.03, 0.34, 0.07, 0.014, [2.09, 0.98, (i - 3) * 0.12]));
+    parts.push(box(m.trim, 0.2, 0.18, 1.92, 0.03, [2.13, 0.56, 0]), box(m.trim, 0.18, 0.16, 1.85, 0.03, [-2.1, 0.56, 0]));
+    for (const s of [1, -1]) parts.push(torus(m.taillight, 0.05, 0.018, 'z', [2.25, 0.56, s * 0.55]));
+    // Spare wheel on the back door.
+    parts.push(torus(m.rubber, 0.27, 0.13, 'x', [-2.2, 1.02, 0]), cyl(m.alloy, 0.2, 0.14, 'x', [-2.2, 1.02, 0]));
+    // Snorkel up the right-hand pillar.
+    parts.push(rod(m.trim, [1.3, 0.95, -0.94], [0.82, 1.3, -0.94], 0.05), rod(m.trim, [0.82, 1.3, -0.94], [0.5, 1.98, -0.87], 0.05));
+    parts.push(...P.plate(m, -2.1, 0.72, -1), ...P.handles(m, loft, [[0.15, 1.16], [-0.95, 1.16]]), ...P.mirrors(m, 0.76, 1.36, 0.89));
+    return {
+      node: group(parts, 'body'), panel: path, loft,
+      stripes: [[[0.8, 1.29], [1.98, 1.255]], [[-1.96, 1.975], [0.42, 1.975]]],
+    };
+  },
+};
+
+const shockMat = new THREE.MeshStandardMaterial({ color: 0xf29900, metalness: 0.6, roughness: 0.3 });
+
+export const monster: BodyStyle = {
+  id: 'monster', wheelRadius: 0.85, wheelbase: 2.4, track: 2.12, wheelWidth: 0.72,
+  seat: [-0.2, 1.72, 0.3], driverScale: 0.85,
+  hood: A(1.4, 1.96, 1.0), nose: A(2.35, 1.4, 1.8), roof: A(-0.42, 2.58, 1.3), deck: A(-2.0, 1.99, 1.6), tail: A(-2.3, 1.35, 1.6),
+  build(m, R) {
+    const halfW = 0.86;
+    const wellR = Math.min(R + 0.1, 1.07);
+    const path = sideOutline(2.25, -2.25, 1.25, [1.2, -1.2], 0.85, wellR, (p) => {
+      p.l(-2.28, 1.95).l(-2.22, 1.98).l(0.55, 1.98).q(2.15, 1.9, 1.6, 1.98).q(2.3, 1.7, 2.28, 1.85).l(2.3, 1.3).l(2.25, 1.25);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 1.72, topExp: 3.2, lowExp: 4, cornerF: 0.16, cornerR: 0.16, wells: [1.2, -1.2], wellR });
+    const parts: O[] = [loft.mesh, P.panelLines(loft, [0.58, -0.62], 1.25, 2.0)];
+    parts.push(...P.greenhouse(m, [-0.95, 1.97], [-0.88, 2.55], [0.05, 2.55], [0.6, 1.97], 1.5));
+    // Chassis, axles, shocks.
+    for (const s of [1, -1]) parts.push(box(m.trim, 4.2, 0.18, 0.12, 0.03, [0, 1.12, s * 0.45]));
+    for (const x of [1.2, -1.2]) {
+      parts.push(cyl(m.gunmetal, 0.1, 2.0, 'z', [x, 0.85, 0]), sphere(m.gunmetal, 0.22, [x, 0.85, 0]));
+      const d = x > 0 ? 1 : -1;
+      for (const s of [1, -1]) {
+        const a: Vec = [x - 0.15 * d, 0.85, s * 0.6], b: Vec = [x - 0.5 * d, 1.25, s * 0.55];
+        parts.push(rod(shockMat, a, b, 0.075), rod(m.chrome, a, b, 0.04));
+      }
+    }
+    for (const s of [1, -1]) {
+      parts.push(...P.headlamp(m, 2.28, 1.72, s * 0.6, 0.1));
+      parts.push(...P.tailLamp(m, -2.27, 1.75, s * 0.64, 0.18, 0.2));
+    }
+    parts.push(...P.grille(m, 2.29, 1.58, 0.3, 0.8, 3));
+    parts.push(capsule(m.trim, 0.08, 1.9, 'z', [2.33, 1.32, 0]), capsule(m.trim, 0.08, 1.9, 'z', [-2.3, 1.32, 0]));
+    parts.push(...P.handles(m, loft, [[-0.45, 1.84]]), ...P.mirrors(m, 0.58, 2.05, 0.81));
+    return {
+      node: group(parts, 'body'), panel: path, loft,
+      stripes: [[[0.6, 1.985], [1.475, 1.965], [2.1, 1.91]], [[-0.88, 2.585], [0.05, 2.585]], [[-2.2, 1.985], [-1.0, 1.985]]],
+    };
+  },
+};
+
+export const bus: BodyStyle = {
+  id: 'bus', wheelRadius: 0.46, wheelbase: 3.4, track: 1.52, wheelWidth: 0.42,
+  seat: [2.15, 1.0, 0.45], driverScale: 0.95,
+  hood: A(-1.6, 2.15, 0.8), nose: A(2.85, 0.6, 1.9), roof: A(0.6, 2.15, 1.6), deck: A(-2.5, 2.15, 1.7), tail: A(-2.8, 0.5, 1.6),
+  build(m, R) {
+    const halfW = 0.95;
+    const wellR = Math.min(R + 0.08, 0.76);
+    const path = sideOutline(2.75, -2.75, 0.5, [1.7, -1.7], 0.46, wellR, (p) => {
+      p.l(-2.78, 1.28).l(-2.75, 1.31).l(2.6, 1.31).q(2.8, 1.2, 2.78, 1.3).l(2.8, 0.54).l(2.76, 0.5);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 0.95, topExp: 8, lowExp: 8, cornerF: 0.12, cornerR: 0.12, wells: [1.7, -1.7], wellR });
+    const parts: O[] = [loft.mesh];
+    parts.push(...P.greenhouse(m, [-2.73, 1.3], [-2.72, 2.12], [2.6, 2.12], [2.78, 1.3], 1.82, [-1.95, -1.15, -0.35, 0.45, 1.25, 2.0], 0.06, 0.14, 0.1));
+    for (const s of [1, -1]) {
+      for (const y of [1.12, 1.24]) parts.push(box(m.trim, 5.4, 0.035, 0.02, 0.009, [0, y, s * (loft.sideZ(0, y) + 0.004)]));
+      parts.push(...P.headlamp(m, 2.79, 0.85, s * 0.68, 0.11));
+      parts.push(...P.tailLamp(m, -2.775, 0.95, s * 0.68, 0.2, 0.2, true));
+      parts.push(sphere(m.amber, 0.07, [2.62, 2.2, s * 0.6]), sphere(m.taillight, 0.07, [-2.7, 2.2, s * 0.6]));
+      parts.push(rod(m.trim, [2.7, 1.35, s * 0.85], [2.9, 1.6, s * 1.05], 0.025));
+      parts.push(box(m.trim, 0.06, 0.3, 0.16, 0.03, [2.92, 1.62, s * 1.08]));
+    }
+    parts.push(...P.grille(m, 2.8, 0.8, 0.3, 0.7, 3));
+    parts.push(box(m.trim, 0.15, 0.18, 1.95, 0.04, [2.82, 0.5, 0]), box(m.trim, 0.15, 0.18, 1.95, 0.04, [-2.8, 0.5, 0]));
+    parts.push(...P.plate(m, -2.79, 0.75, -1), ...P.exhaust(m, -2.8, 0.42, [0.6]));
+    return { node: group(parts, 'body'), panel: path, loft, stripes: [[[-2.72, 2.155], [2.6, 2.155]]] };
+  },
+};
+
+export const bodies: BodyStyle[] = [muscle, sports, formula, pickup, offroad, monster, bus];
+export const airfoil = P.airfoil;

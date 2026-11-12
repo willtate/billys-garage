@@ -1,18 +1,26 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1f1f1f; touch-action: none;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; font-family: -apple-system, system-ui, sans-serif; }
 #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#tray { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
-  display: flex; gap: 14px; align-items: center; }
-#tabs { display: flex; flex-direction: column; gap: 10px; }
-.tab { width: 64px; height: 64px; border-radius: 20px; border: 4px solid rgba(255,255,255,0.0); font-size: 30px;
-  display: grid; place-items: center; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
-.tab.on { border-color: white; transform: scale(1.06); }
-#cards { flex: 1; display: flex; gap: 14px; overflow-x: auto; padding: 10px 4px; scrollbar-width: none; touch-action: pan-x; }
+
+/* Parts tray: a row of round category buttons over a dark panel of picture cards. */
+#tray { position: fixed; left: 0; right: 0; bottom: 0; padding: 0 16px calc(12px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+#tabs { display: flex; gap: 12px; padding: 0 10px; pointer-events: auto; }
+.tab { width: 66px; height: 66px; border-radius: 50%; border: 5px solid transparent; font-size: 30px;
+  display: grid; place-items: center; box-shadow: 0 5px 12px rgba(0,0,0,0.45), inset 0 -6px 10px rgba(0,0,0,0.2), inset 0 5px 8px rgba(255,255,255,0.35);
+  transition: transform 0.12s; }
+.tab.on { border-color: white; transform: scale(1.12); }
+#cards { display: flex; gap: 14px; overflow-x: auto; padding: 18px 14px 14px; scrollbar-width: none; touch-action: pan-x;
+  pointer-events: auto; border-radius: 22px; background: rgba(28,28,30,0.92); position: relative;
+  border-top: 10px solid transparent;
+  border-image: repeating-linear-gradient(-45deg, #ffcc00 0 14px, #111 14px 28px) 10 0 0 0 / 10px 0 0 0; }
 #cards::-webkit-scrollbar { display: none; }
-.card { flex: 0 0 auto; width: 120px; height: 120px; border-radius: 26px; background: rgba(255,255,255,0.92);
+.card { flex: 0 0 auto; width: 130px; height: 120px; border-radius: 20px; background: #3a3a3c;
   border: 5px solid transparent; box-shadow: 0 6px 14px rgba(0,0,0,0.45); display: grid; place-items: center;
   transition: transform 0.12s; overflow: hidden; }
-.card.on { border-color: #ffcc00; transform: scale(1.06); }
+.card.wide { width: 172px; }
+.card.on { border-color: #ff8a1f; transform: scale(1.05); }
 .card:active { transform: scale(0.94); }
 .card img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.card.none { font-size: 54px; color: #8e8e93; font-weight: 900; }
 .swatch { width: 84px; height: 84px; border-radius: 50%; box-shadow: inset 0 -8px 14px rgba(0,0,0,0.35), inset 0 6px 10px rgba(255,255,255,0.45); }

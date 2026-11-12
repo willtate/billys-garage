@@ -1,16 +1,27 @@
 import * as THREE from 'three';
-import { box, canvas, mergeStatic, tracePath } from './geom';
-import { BodyBuild, BodyStyle, makeDriver, stripes } from './bodies';
+import { box, canvas, mergeStatic } from './geom';
+import { addons } from './addons';
+import { anchor, BodyStyle, makeDriver, Slot, stripes } from './bodies';
+import { makeSticker } from './stickers';
 import { CarMaterials } from './materials';
 import { WheelStyle } from './wheels';
 
-export interface Design { body: string; wheels: string; paint: string; sticker: string }
+export interface Design {
+  body: string; wheels: string; paint: string; sticker: string;
+  engine: string; front: string; roof: string; back: string;
+}
+export const slots: Slot[] = ['engine', 'front', 'roof', 'back'];
 
 export interface BuiltCar {
   root: THREE.Group;
   body: THREE.Group;
   spinners: THREE.Object3D[];
   driver: THREE.Group;
+  addons: Partial<Record<Slot, THREE.Object3D>>;
+  /** Animated bits (police lights, beacon, rocket flames): call every frame. */
+  tickers: ((now: number) => void)[];
+  /** Where exhaust smoke comes out, in car space. */
+  tailpipe: THREE.Vector3;
 }
 
 /** Soft dark patch under the car so it looks planted on the floor. */
@@ -45,7 +56,9 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
   bodyNode.position.y += lift;
   bodyNode.userData.baseY = bodyNode.position.y;
   root.add(bodyNode);
-  if (design.sticker === 'stripes') bodyNode.add(...stripes(shell, m), sideStripes(shell, m));
+  if (design.sticker === 'stripes') bodyNode.add(...stripes(shell, m));
+  const sticker = makeSticker(design.sticker, body.id, shell, m);
+  if (sticker) bodyNode.add(sticker);
 
   const driver = makeDriver(m);
   driver.position.set(...body.seat);
@@ -54,6 +67,19 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
 
   // Everything on the body except the bobbing helmet becomes a few big meshes.
   mergeStatic(bodyNode, (o) => o.name === 'head');
+
+  const fitted: BuiltCar['addons'] = {};
+  const tickers: BuiltCar['tickers'] = [];
+  for (const slot of slots) {
+    const make = (addons[slot].find((a) => a.id === design[slot]) ?? addons[slot][0]).build;
+    if (!make) continue;
+    const n = make(m, body);
+    const a = anchor(body, slot);
+    n.position.set(a.x, a.y, 0);
+    bodyNode.add(n);
+    fitted[slot] = n;
+    if (n.userData.tick) tickers.push(n.userData.tick);
+  }
 
   const spinners: THREE.Object3D[] = [];
   const halfTrack = body.track / 2 + (width - body.wheelWidth) / 2;
@@ -86,34 +112,6 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
   shadow.renderOrder = -1;
   root.add(shadow);
 
-  return { root, body: bodyNode, spinners, driver };
-}
-
-/** Twin pinstripes along both flanks, drawn white and tinted with the stripe colour. */
-function sideStripes(shell: BodyBuild, m: CarMaterials): THREE.Object3D {
-  const b = shell.panel.bounds();
-  const scale = 220, L = b.width, H = b.height;
-  const draw = (mirror: boolean) => {
-    const el = canvas(Math.round(L * scale), Math.round(H * scale), (c, W, Hh) => {
-      if (mirror) { c.translate(W, 0); c.scale(-1, 1); }
-      c.translate(0, Hh); c.scale(scale, -scale); c.translate(-b.minX, -b.minY);
-      tracePath(c, shell.panel); c.clip();
-      c.fillStyle = '#fff';
-      c.fillRect(b.minX, b.minY + H * 0.3, L, H * 0.09);
-      c.fillRect(b.minX, b.minY + H * 0.44, L, H * 0.04);
-      // Wipe a band along the outline where the rounded edge curves away.
-      c.globalCompositeOperation = 'destination-out';
-      tracePath(c, shell.panel);
-      c.lineWidth = 0.11 * 2 + 0.03; c.lineJoin = 'round'; c.stroke();
-    });
-    const t = new THREE.CanvasTexture(el);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
-    return t;
-  };
-  return shell.loft.decal(draw(false), draw(true), b, 0.006, 5, (map) => {
-    const mat = new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -4 });
-    mat.color = m.stripe.color; // shared, so a paint change recolours it
-    return mat;
-  });
+  const tailpipe = new THREE.Vector3(body.tail.x - 0.1, body.tail.y + lift, 0);
+  return { root, body: bodyNode, spinners, driver, addons: fitted, tickers, tailpipe };
 }

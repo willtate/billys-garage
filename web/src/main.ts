@@ -1,6 +1,8 @@
 import * as THREE from 'three';
-import { muscle } from './bodies';
-import { BuiltCar, buildCar, Design } from './car';
+import { bodies } from './bodies';
+import { BuiltCar, buildCar, Design, slots } from './car';
+import { addons } from './addons';
+import { stickers } from './stickers';
 import { makeReflectionRig, makeTurntable, makeWorkshop } from './garage';
 import { CarMaterials, paints } from './materials';
 import { wheels } from './wheels';
@@ -67,15 +69,16 @@ const saved = (() => {
   try { return JSON.parse(localStorage.getItem('vroom.design') ?? 'null') as Design | null; } catch { return null; }
 })();
 const q = new URLSearchParams(location.search);
-let design: Design = { body: 'muscle', wheels: 'alloy', paint: 'blue', sticker: 'stripes', ...(saved ?? {}) };
-for (const k of ['wheels', 'paint', 'sticker'] as const) { const v = q.get(k); if (v) design[k] = v; }
+let design: Design = { body: 'muscle', wheels: 'alloy', paint: 'blue', sticker: 'stripes', engine: 'none', front: 'none', roof: 'none', back: 'none', ...(saved ?? {}) };
+for (const k of ['body', 'wheels', 'paint', 'sticker', ...slots] as const) { const v = q.get(k); if (v) design[k] = v; }
 let car: BuiltCar | null = null;
 let popT0 = 0, hopT0 = -1e9;
 
 function rebuild(pop: boolean) {
   if (car) carHolder.remove(car.root);
   const wheel = wheels.find((w) => w.id === design.wheels) ?? wheels[0];
-  car = buildCar(design, muscle, wheel, materials);
+  const body = bodies.find((b) => b.id === design.body) ?? bodies[0];
+  car = buildCar(design, body, wheel, materials);
   carHolder.add(car.root);
   if (pop) popT0 = performance.now();
 }
@@ -88,7 +91,8 @@ function apply(next: Design) {
     materials.setPaint(paints.find((p) => p.id === next.paint) ?? paints[7], true);
     hopT0 = performance.now();
   }
-  if (prev.wheels !== next.wheels || prev.sticker !== next.sticker) rebuild(true);
+  const keys: (keyof Design)[] = ['body', 'wheels', 'sticker', ...slots];
+  if (keys.some((k) => prev[k] !== next[k])) rebuild(true);
 }
 
 materials.setPaint(paints.find((p) => p.id === design.paint) ?? paints[7], false);
@@ -148,12 +152,18 @@ view.addEventListener('wheel', (e) => {
 
 const tabs = document.getElementById('tabs')!;
 const cards = document.getElementById('cards')!;
-type Tab = 'paint' | 'wheels';
-let tab: Tab = q.get('tab') === 'wheels' ? 'wheels' : 'paint';
+type Tab = 'body' | 'wheels' | 'paint' | 'sticker' | 'engine' | 'front' | 'roof' | 'back';
 const tabInfo: Record<Tab, { color: string; icon: string }> = {
-  paint: { color: '#f2404d', icon: '🎨' },
+  body: { color: '#ff7a21', icon: '🚗' },
   wheels: { color: '#298cff', icon: '🛞' },
+  paint: { color: '#f2404d', icon: '🎨' },
+  sticker: { color: '#ffb80d', icon: '🔥' },
+  engine: { color: '#8c94a3', icon: '⚙️' },
+  front: { color: '#2eb866', icon: '🛡️' },
+  roof: { color: '#945cff', icon: '🚨' },
+  back: { color: '#0db3cc', icon: '🏁' },
 };
+let tab: Tab = (Object.keys(tabInfo) as Tab[]).find((t) => t === q.get('tab')) ?? 'body';
 const thumbs = new Map<string, string>();
 
 function renderTabs() {
@@ -163,74 +173,133 @@ function renderTabs() {
     b.className = 'tab' + (t === tab ? ' on' : '');
     b.style.background = tabInfo[t].color;
     b.textContent = tabInfo[t].icon;
-    b.onpointerdown = () => { tab = t; renderTabs(); renderCards(); };
+    b.onpointerdown = () => { tab = t; renderTabs(); renderCards(); cards.scrollLeft = 0; };
     tabs.append(b);
+  }
+}
+
+interface Card { on: boolean; pick: () => void; img?: () => string; swatch?: string; label?: string; wide?: boolean }
+
+function cardsFor(t: Tab): Card[] {
+  const d = design;
+  const pick = (patch: Partial<Design>) => () => apply({ ...d, ...patch });
+  switch (t) {
+    case 'body':
+      return bodies.map((b) => ({ on: d.body === b.id, pick: pick({ body: b.id }), wide: true,
+        img: () => thumb(`body:${b.id}:${d.paint}:${d.wheels}`, () => carThumb({ ...d, body: b.id }, -0.6)) }));
+    case 'wheels':
+      return wheels.map((w) => ({ on: d.wheels === w.id, pick: pick({ wheels: w.id }), img: () => thumbs.get(w.id) ?? '' }));
+    case 'paint':
+      return paints.map((p) => ({ on: d.paint === p.id, pick: pick({ paint: p.id }),
+        swatch: p.metallic ? `radial-gradient(circle at 35% 30%, #fff, ${p.color} 45%, #333)` : p.color }));
+    case 'sticker':
+      return stickers.map((id) => ({ on: d.sticker === id, pick: pick({ sticker: id }), wide: true,
+        img: id === 'none' ? undefined : () => thumb(`sticker:${id}:${d.body}:${d.paint}`, () => carThumb({ ...d, sticker: id }, -0.05, 1.05)),
+        label: id === 'none' ? '✕' : undefined }));
+    default:
+      return addons[t].map((a) => ({ on: d[t] === a.id, pick: pick({ [t]: a.id }),
+        img: a.build ? () => thumb(`${t}:${a.id}:${d.body}:${d.paint}`, () => addonThumb(t, a.id)) : undefined,
+        label: a.build ? undefined : '✕' }));
   }
 }
 
 function renderCards() {
   cards.innerHTML = '';
-  if (tab === 'paint') {
-    for (const p of paints) {
-      const c = document.createElement('div');
-      c.className = 'card' + (design.paint === p.id ? ' on' : '');
+  for (const card of cardsFor(tab)) {
+    const c = document.createElement('div');
+    c.className = 'card' + (card.wide ? ' wide' : '') + (card.on ? ' on' : '');
+    if (card.swatch) {
       const s = document.createElement('div');
       s.className = 'swatch';
-      s.style.background = p.metallic ? `radial-gradient(circle at 35% 30%, #fff, ${p.color} 45%, #333)` : p.color;
+      s.style.background = card.swatch;
       c.append(s);
-      c.onclick = () => { apply({ ...design, paint: p.id }); renderCards(); };
-      cards.append(c);
-    }
-  } else {
-    for (const w of wheels) {
-      const c = document.createElement('div');
-      c.className = 'card' + (design.wheels === w.id ? ' on' : '');
+    } else if (card.img) {
       const img = document.createElement('img');
-      img.src = thumbs.get(w.id) ?? '';
-      img.alt = w.label;
+      img.src = card.img();
       c.append(img);
-      c.onclick = () => { apply({ ...design, wheels: w.id }); renderCards(); };
-      cards.append(c);
+    } else {
+      c.textContent = card.label ?? '';
+      c.classList.add('none');
     }
+    c.onclick = () => { card.pick(); renderCards(); };
+    cards.append(c);
   }
 }
 
-/** Little 3D pictures of each wheel for the cards, rendered once with a throwaway renderer. */
-function renderThumbs() {
-  // Drawn with the main renderer (so they share the garage reflections), copied off the canvas
-  // straight after each render while the drawing buffer is still valid.
-  const size = 200;
+// MARK: Card pictures — drawn with the main renderer (so they share the garage reflections)
+// and copied off the canvas straight after each render while the drawing buffer is valid.
+
+const thumbScene = (() => {
   const s = new THREE.Scene();
   s.environment = scene.environment;
   s.environmentIntensity = 1.1;
-  s.background = new THREE.Color(0xf2f2f2);
+  s.background = new THREE.Color(0x5a4a3e);
   const sun = new THREE.DirectionalLight(0xffffff, 2.5);
   sun.position.set(2, 3, 4);
   s.add(sun, new THREE.HemisphereLight(0xffffff, 0x888888, 0.8));
+  return s;
+})();
+
+function snapshot(obj: THREE.Object3D, cam: THREE.PerspectiveCamera, w: number, h: number): string {
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const ratio = renderer.getPixelRatio();
+  renderer.setPixelRatio(1);
+  renderer.setSize(w, h, false);
+  thumbScene.add(obj);
+  renderer.render(thumbScene, cam);
+  out.getContext('2d')!.drawImage(renderer.domElement, 0, 0, w, h);
+  thumbScene.remove(obj);
+  renderer.setPixelRatio(ratio);
+  resize();
+  return out.toDataURL();
+}
+
+function renderWheelThumbs() {
   const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
   cam.position.set(0.7, 0.35, 1.9);
   cam.lookAt(0, 0, 0);
-  const out = document.createElement('canvas');
-  out.width = out.height = size;
-  const ctx = out.getContext('2d')!;
-  const ratio = renderer.getPixelRatio();
-  renderer.setPixelRatio(1);
-  renderer.setSize(size, size, false);
   for (const w of wheels) {
     const g = w.build(materials, 0.38, 0.4 * w.widthScale / w.scale);
     g.rotation.x = Math.PI / 2;
-    s.add(g);
-    renderer.render(s, cam);
-    ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(renderer.domElement, 0, 0, size, size);
-    thumbs.set(w.id, out.toDataURL());
-    s.remove(g);
+    thumbs.set(w.id, snapshot(g, cam, 200, 200));
   }
-  renderer.setPixelRatio(ratio);
+}
+
+function thumb(key: string, make: () => string): string {
+  let v = thumbs.get(key);
+  if (!v) { v = make(); thumbs.set(key, v); }
+  return v;
+}
+
+/** Point a camera at an object's bounding box from the front-left, a little above. */
+function frame(obj: THREE.Object3D, aspect: number, fov = 26, spread = 1.75) {
+  const cam = new THREE.PerspectiveCamera(fov, aspect, 0.05, 60);
+  const box = new THREE.Box3().setFromObject(obj);
+  const centre = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  const d = Math.max(size.x, size.z * 1.2, size.y * 1.6) * spread;
+  cam.position.set(centre.x, centre.y + d * 0.35, centre.z + d);
+  cam.lookAt(centre);
+  return cam;
+}
+
+function carThumb(d: Design, turn: number, spread = 1.75): string {
+  const body = bodies.find((b) => b.id === d.body) ?? bodies[0];
+  const wheel = wheels.find((w) => w.id === d.wheels) ?? wheels[0];
+  const c = buildCar(d, body, wheel, materials);
+  c.root.rotation.y = turn;
+  return snapshot(c.root, frame(c.root, 1.4, 26, spread), 280, 200);
+}
+
+function addonThumb(slot: typeof slots[number], id: string): string {
+  const body = bodies.find((b) => b.id === design.body) ?? bodies[0];
+  const g = addons[slot].find((a) => a.id === id)!.build!(materials, body);
+  g.rotation.y = -0.7;
+  return snapshot(g, frame(g, 1, 30, 1.9), 200, 200);
 }
 
 autoUpdate(() => (touching ? performance.now() : lastTouch));
-renderThumbs();
+renderWheelThumbs();
 renderTabs();
 renderCards();
 
@@ -285,6 +354,7 @@ renderer.setAnimationLoop((now) => {
     car.root.scale.setScalar(p < 1 ? 0.85 + 0.15 * Math.sin(p * Math.PI * 0.5) + 0.06 * Math.sin(p * Math.PI) : 1);
     const h = (now - hopT0) / 520;
     car.body.position.y = car.body.userData.baseY + (h < 1 ? Math.abs(Math.sin(h * Math.PI * 2)) * 0.12 : 0);
+    for (const t of car.tickers) t(now);
     const head = car.driver.getObjectByName('head');
     if (head) head.position.y = 0.66 + 0.01 * Math.max(0, Math.sin(now / 190));
   }
