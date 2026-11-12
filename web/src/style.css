@@ -41,3 +41,7 @@ body.washing #tray { opacity: 0.45; transition: opacity 0.3s; }
 #mud { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; font-size: 40px; background: #8a5a2e;
   box-shadow: 0 7px 14px rgba(0,0,0,0.45), inset 0 -8px 12px rgba(0,0,0,0.22), inset 0 6px 10px rgba(255,255,255,0.3); }
 #mud:active { transform: scale(0.92); }
+/* Out for a drive: the tray and buttons slide away (the horn stays). */
+#tray, #go, #wash, #mud { transition: transform 0.5s, opacity 0.3s; }
+body.outing #tray { transform: translateY(150%); }
+body.outing #go, body.outing #wash, body.outing #mud { transform: translateX(160px); }

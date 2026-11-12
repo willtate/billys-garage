@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Handy URL options: `?fps` shows frame rate and draw calls, and in dev `?washnow&at=2000` (or `?gonow`, `?mudnow=3`) fast-forwards an animation for screenshots.
+Handy URL options: `?fps` shows frame rate and draw calls, and in dev `?washnow&at=2000` (or `?gonow`, `?drivenow`, `?mudnow=3`) fast-forwards an animation for screenshots.
 
 ## iPad (native)
 

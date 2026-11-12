@@ -2,7 +2,7 @@
 // files to download. Browsers only allow sound after the first touch, so `unlock` must be called
 // from a touch handler.
 
-export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee' | 'splat' | 'siren';
+export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee' | 'splat' | 'siren' | 'motor' | 'baa' | 'door';
 
 const SR = 44100;
 const TAU = Math.PI * 2;
@@ -154,6 +154,42 @@ const recipes: Record<Effect, () => AudioBuffer> = {
       d[i] = (sq * 0.7 + 0.3 * Math.sin(TAU * ph * 2)) * 0.24 * Math.min(1, t / 0.02) * Math.min(1, (1.7 - t) / 0.12);
     }
   }),
+  // Out for a drive: one second of steady engine that loops seamlessly (whole cycles only).
+  motor: () => make(1, (d, n) => {
+    let y = 0;
+    const noise = lcg(4321);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const ph = 120 * t + 0.02 * Math.sin(TAU * 2 * t), sub = 60 * t;
+      const x = (2 * (ph - Math.floor(ph)) - 1) * 0.5 + (2 * (sub - Math.floor(sub)) - 1) * 0.4 + noise() * 0.1;
+      y += 0.22 * (x - y);
+      d[i] = Math.tanh(y * 1.8) * 0.42;
+    }
+  }),
+  // A sheep saying hello.
+  baa: () => make(0.75, (d, n) => {
+    let ph = 0, y = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const f = (330 + 50 * Math.min(1, t / 0.08) - 60 * t) * (1 + 0.035 * Math.sin(TAU * 26 * t));
+      ph += f / SR;
+      const saw = 2 * (ph - Math.floor(ph)) - 1;
+      y += 0.18 * (saw - y);
+      const env = Math.min(1, t / 0.04) * Math.min(1, (0.75 - t) / 0.25);
+      d[i] = (y * 1.4 + 0.25 * Math.sin(TAU * 3 * ph)) * env * 0.4;
+    }
+  }),
+  // The roll-up door rattling open.
+  door: () => make(1.0, (d, n) => {
+    const noise = lcg(99);
+    let lo = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      lo += 0.05 * (noise() - lo);
+      const rattle = 0.5 + 0.5 * Math.sign(Math.sin(TAU * 22 * t));
+      d[i] = (lo * 4 * rattle + Math.sin(TAU * 70 * t) * 0.15) * Math.min(1, t / 0.05) * Math.min(1, (1 - t) / 0.2) * 0.5;
+    }
+  }),
   vroom: () => make(4.7, (d, n) => {
     let ph = 0, sub = 0, y = 0;
     const noise = lcg(987);
@@ -185,12 +221,34 @@ export function unlock() {
   if (ctx.state !== 'running') ctx.resume();
 }
 
-export function play(e: Effect) {
-  if (!ctx || !out) return;
+function source(e: Effect): AudioBufferSourceNode | null {
+  if (!ctx || !out) return null;
   let b = buffers.get(e);
   if (!b) { b = recipes[e](); buffers.set(e, b); }
   const src = ctx.createBufferSource();
   src.buffer = b;
-  src.connect(out);
+  return src;
+}
+
+export function play(e: Effect) {
+  const src = source(e);
+  if (!src) return;
+  src.connect(out!);
   src.start();
+}
+
+/** Play a sound on repeat. `rate` bends its pitch (engine speed); `stop` fades it out. */
+export function loop(e: Effect) {
+  const src = source(e);
+  if (!src || !ctx) return { rate: (_: number) => {}, stop: () => {} };
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  gain.gain.setTargetAtTime(1, ctx.currentTime, 0.08);
+  src.loop = true;
+  src.connect(gain).connect(out!);
+  src.start();
+  return {
+    rate: (r: number) => src.playbackRate.setTargetAtTime(r, ctx!.currentTime, 0.1),
+    stop: () => { gain.gain.setTargetAtTime(0, ctx!.currentTime, 0.15); src.stop(ctx!.currentTime + 1); },
+  };
 }
