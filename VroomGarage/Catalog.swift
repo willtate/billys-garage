@@ -59,12 +59,17 @@ final class CarMaterials {
     let taillight = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.1, blue: 0.1, alpha: 1), rough: 0.2,
                                      emission: UIColor(red: 0.9, green: 0.05, blue: 0.05, alpha: 1))
 
+    /// Racing stripes: white on dark paint, near-black on light paint.
+    let stripe = SCNMaterial.pbr(.white, rough: 0.3, clearCoat: true)
+
     func setPaint(_ p: PaintStyle, animated: Bool) {
         SCNTransaction.begin()
         SCNTransaction.animationDuration = animated ? 0.45 : 0
         paint.diffuse.contents = p.color
         paint.metalness.contents = p.metallic ? 0.85 : 0.15
         paint.roughness.contents = p.metallic ? 0.22 : 0.32
+        let light = ["white", "yellow", "silver", "gold"].contains(p.id)
+        stripe.diffuse.contents = light ? UIColor(white: 0.12, alpha: 1) : UIColor(white: 0.98, alpha: 1)
         SCNTransaction.commit()
     }
 }
@@ -312,6 +317,26 @@ enum Catalog {
                 s.position = V(cos(a) * rr, Float(w) * 0.5 + Float(pipe) * 0.05, sin(a) * rr)
                 s.eulerAngles = V(.pi / 2, Float(i) * 1.3, 0)
                 parts.append(s)
+            }
+            return group(nil, parts)
+        },
+        WheelStyle(id: "wire", scale: 1.05, widthScale: 0.9) { m, r, w in
+            let tire = torusNode(m.rubber, ring: r * 0.78, pipe: r * 0.22, at: V(0, 0, 0))
+            tire.scale = V(1, Float(w / (r * 0.44)), 1)
+            var parts = [tire,
+                         torusNode(m.chrome, ring: r * 0.56, pipe: r * 0.04, at: V(0, 0, 0)),
+                         cylNode(m.chrome, r: r * 0.14, h: w * 0.7, at: V(0, 0, 0)),
+                         sphereNode(m.paint, r: r * 0.09, at: V(0, Float(w) * 0.35, 0))]
+            let count = 18
+            for i in 0..<count {
+                let a = Float(i) / Float(count) * 2 * .pi
+                let lace: Float = i % 2 == 0 ? 0.22 : -0.22
+                // Lay the spoke along +X, then swing it round the axle to angle `a`.
+                let spoke = cylNode(m.chrome, r: r * 0.014, h: r * 0.44, axis: .x, at: V(Float(r) * 0.35, Float(w) * lace, 0))
+                let arm = SCNNode()
+                arm.eulerAngles.y = -a
+                arm.addChildNode(spoke)
+                parts.append(arm)
             }
             return group(nil, parts)
         },

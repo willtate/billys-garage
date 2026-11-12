@@ -10,6 +10,8 @@ xcrun simctl install $D build/Build/Products/Debug-iphonesimulator/VroomGarage.a
 xcrun simctl launch $D com.example.VroomGarage ${=3} >/dev/null
 sleep ${2:-4}
 xcrun simctl io $D screenshot "${TMPDIR:-/private/tmp/claude-502}/vg_raw.png" >/dev/null 2>&1
-sips -r 270 "${TMPDIR:-/private/tmp/claude-502}/vg_raw.png" --out gauntlet/ours/$1.png >/dev/null
+RAW="${TMPDIR:-/private/tmp/claude-502}/vg_raw.png"
+W=$(sips -g pixelWidth "$RAW" | awk '/pixelWidth/{print $2}'); H=$(sips -g pixelHeight "$RAW" | awk '/pixelHeight/{print $2}')
+if [ "$W" -lt "$H" ]; then sips -r ${ROT:-270} "$RAW" --out gauntlet/ours/$1.png >/dev/null; else cp "$RAW" gauntlet/ours/$1.png; fi
 sips -Z 1600 gauntlet/ours/$1.png >/dev/null
 echo gauntlet/ours/$1.png
