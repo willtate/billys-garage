@@ -6,9 +6,9 @@ import { CarMaterials } from './materials';
 /** Side decals. Art is drawn to fit the body's side outline, so it never hangs over a wheel well. */
 
 export const stickers = ['none', 'stripes', 'flames', 'lightning', 'checker', 'number'];
-const numbers: Record<string, string> = { muscle: '1', sports: '7', formula: '5', pickup: '4', offroad: '9', monster: '8', bus: '3' };
+const numbers: Record<string, string> = { muscle: '1', sports: '7', formula: '5', pickup: '4', offroad: '9', monster: '8', bus: '3', firetruck: '6', police: '2' };
 /** How far each body's rounded edges eat into its flat side. */
-const insets: Record<string, number> = { muscle: 0.11, sports: 0.12, formula: 0.1, pickup: 0.12, offroad: 0.1, monster: 0.12, bus: 0.12 };
+const insets: Record<string, number> = { muscle: 0.11, sports: 0.12, formula: 0.1, pickup: 0.12, offroad: 0.1, monster: 0.12, bus: 0.12, firetruck: 0.1, police: 0.11 };
 /** Flat-sided bodies (no rounded skin): how far the side is from the centre line. */
 const panelZ: Record<string, number> = { formula: 0.62 };
 

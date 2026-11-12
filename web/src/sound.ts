@@ -2,7 +2,7 @@
 // files to download. Browsers only allow sound after the first touch, so `unlock` must be called
 // from a touch handler.
 
-export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee' | 'splat';
+export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray' | 'whee' | 'splat' | 'siren';
 
 const SR = 44100;
 const TAU = Math.PI * 2;
@@ -139,6 +139,19 @@ const recipes: Record<Effect, () => AudioBuffer> = {
         s += (lo * 3 + Math.sin(TAU * (90 + 25 * k) * dt * (1 - dt * 2))) * env * (1 - k * 0.15);
       }
       d[i] = Math.tanh(s * 1.4) * 0.45;
+    }
+  }),
+  // Fire truck / police: "nee-naw nee-naw".
+  siren: () => make(1.7, (d, n) => {
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const step = Math.floor(t / 0.4), within = (t % 0.4) / 0.4;
+      const target = step % 2 === 0 ? 960 : 720, prev = step % 2 === 0 ? 720 : 960;
+      const f = step === 0 ? target : prev + (target - prev) * Math.min(1, within / 0.12);
+      ph += f / SR;
+      const sq = Math.tanh(Math.sin(TAU * ph) * 3);
+      d[i] = (sq * 0.7 + 0.3 * Math.sin(TAU * ph * 2)) * 0.24 * Math.min(1, t / 0.02) * Math.min(1, (1.7 - t) / 0.12);
     }
   }),
   vroom: () => make(4.7, (d, n) => {

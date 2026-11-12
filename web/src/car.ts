@@ -74,6 +74,7 @@ export function buildCar(design: Design, body: BodyStyle, wheel: WheelStyle, m: 
 
   const fitted: BuiltCar['addons'] = {};
   const tickers: BuiltCar['tickers'] = [];
+  if (shell.tick) tickers.push(shell.tick);
   for (const slot of slots) {
     const make = (addons[slot].find((a) => a.id === design[slot]) ?? addons[slot][0]).build;
     if (!make) continue;

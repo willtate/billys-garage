@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { bodies } from './bodies';
+import { bodies, emergency } from './bodies';
 import { BuiltCar, buildCar, Design, slots } from './car';
 import { addons } from './addons';
 import { stickers } from './stickers';
@@ -192,7 +192,7 @@ function sparkles(color: THREE.Color) {
 }
 
 function honk() {
-  play('honk');
+  play(emergency.has(design.body) ? 'siren' : 'honk');
   squash();
   const h = materials.headlight, base = h.emissiveIntensity;
   const flash = [[0, 150, base * 2.5], [150, 100, base], [250, 200, base * 2.5], [450, 1, base]];
@@ -233,6 +233,7 @@ function vroom() {
   if (driving || washing || !car) return;
   driving = true;
   play('vroom');
+  if (emergency.has(design.body)) play('siren');
   const c = car;
   // Spin every wheel; right-side mounts are flipped, so they spin the other way.
   for (const s of c.spinners) animate(0, LAP + 300, (u) => { s.rotation.z = s.userData.dir * 90 * smooth(u); });

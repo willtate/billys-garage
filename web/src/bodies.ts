@@ -13,6 +13,8 @@ export interface BodyBuild {
   stripes: [number, number][][];
   /** The rounded skin, when the body has one (side stickers wrap onto it). */
   loft?: Loft;
+  /** Emergency vehicles: flashing lights, run every frame. */
+  tick?: (now: number) => void;
 }
 
 /** A spot on the body where an add-on bolts on, and how much room there is across the car. */
@@ -506,5 +508,155 @@ export const bus: BodyStyle = {
   },
 };
 
-export const bodies: BodyStyle[] = [muscle, sports, formula, pickup, offroad, monster, bus];
+// MARK: - Emergency vehicles
+
+/** Red and blue lights that flash in turn. `fast` doubles the rate (siren mode). */
+function beacons() {
+  const red = new THREE.MeshStandardMaterial({ color: 0xff1a1a, roughness: 0.15, emissive: 0xff0000, emissiveIntensity: 2 });
+  const blue = new THREE.MeshStandardMaterial({ color: 0x2659ff, roughness: 0.15, emissive: 0x1a4dff, emissiveIntensity: 2 });
+  const tick = (now: number) => {
+    const on = Math.floor(now / 220) % 2 === 0;
+    red.emissiveIntensity = on ? 2.4 : 0.05;
+    blue.emissiveIntensity = on ? 0.05 : 2.4;
+  };
+  return { red, blue, tick };
+}
+
+/** A lit bar of lights: red on the left, blue on the right, clear in the middle. */
+function lightBar(m: CarMaterials, b: ReturnType<typeof beacons>, x: number, y: number, w: number): O[] {
+  return [
+    box(m.trim, 0.32, 0.06, w + 0.04, 0.02, [x, y + 0.03, 0]),
+    box(b.red, 0.26, 0.13, w / 2 - 0.05, 0.05, [x, y + 0.12, w / 4 + 0.015]),
+    box(b.blue, 0.26, 0.13, w / 2 - 0.05, 0.05, [x, y + 0.12, -w / 4 - 0.015]),
+    box(m.white, 0.27, 0.06, 0.07, 0.02, [x, y + 0.12, 0]),
+  ];
+}
+
+/** Five-point star badge for the police doors. */
+function star(c: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
+  c.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.45 : r;
+    c.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+  c.closePath();
+}
+
+export const firetruck: BodyStyle = {
+  id: 'firetruck', wheelRadius: 0.48, wheelbase: 3.5, track: 1.66, wheelWidth: 0.44,
+  seat: [2.2, 1.18, 0.45], driverScale: 0.95,
+  hood: A(-2.5, 2.0, 0.8), nose: A(2.95, 0.72, 1.9), roof: A(1.75, 2.38, 1.3), deck: A(-2.8, 2.0, 1.6), tail: A(-2.92, 0.55, 1.6),
+  build(m, R) {
+    const halfW = 1.0;
+    const wellR = Math.min(R + 0.08, 0.8);
+    const wells = [1.95, -1.55];
+    const path = sideOutline(2.9, -2.9, 0.55, wells, 0.48, wellR, (p) => {
+      p.l(-2.93, 0.6).l(-2.93, 1.95).l(-2.88, 2.0).l(1.06, 2.0).l(1.1, 1.58).l(2.84, 1.58)
+        .q(2.93, 1.48, 2.92, 1.58).l(2.93, 0.6).l(2.88, 0.55);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 1.2, topExp: 9, lowExp: 9, cornerF: 0.12, cornerR: 0.1, wells, wellR });
+    const lights = beacons();
+    const parts: O[] = [loft.mesh, P.panelLines(loft, [1.15, 1.98], 0.6, 1.58)];
+    // Cab: tall windows all round, door split behind the front wheel.
+    parts.push(...P.greenhouse(m, [1.14, 1.57], [1.2, 2.36], [2.68, 2.36], [2.9, 1.57], 1.96, [1.98], 0.06, 0.14, 0.05));
+    for (const s of [1, -1]) {
+      const z = (x: number, y: number) => s * (loft.sideZ(x, y) + 0.004);
+      // White stripe along the whole truck, and a chrome rub-rail under it.
+      parts.push(box(m.white, 5.7, 0.13, 0.02, 0.009, [0, 1.06, z(0, 1.06)]));
+      parts.push(box(m.chrome, 5.6, 0.035, 0.02, 0.009, [0, 0.95, z(0, 0.95)]));
+      // Roll-up lockers between and behind the wheels.
+      for (const [x, w] of [[0.2, 1.7], [-2.42, 0.82]]) {
+        parts.push(box(m.alloy, w, 0.68, 0.025, 0.02, [x, 1.6, z(x, 1.6)]));
+        for (let k = 0; k < 7; k++) parts.push(box(m.gunmetal, w - 0.04, 0.012, 0.03, 0, [x, 1.32 + k * 0.09, z(x, 1.6) + s * 0.006]));
+      }
+      // Yellow hose coiled on the side.
+      parts.push(torus(m.yellow, 0.2, 0.05, 'z', [-0.95, 1.5, s * (halfW + 0.06)]));
+      // Corner warning lights and the cab's light bar.
+      parts.push(box(lights.red, 0.08, 0.1, 0.08, 0.03, [2.92, 1.5, s * 0.82]), box(lights.blue, 0.08, 0.1, 0.08, 0.03, [-2.92, 1.88, s * 0.82]));
+      parts.push(P.rectLamp(m, 2.93, 0.88, s * 0.7, 0.18, 0.3));
+      parts.push(...P.tailLamp(m, -2.93, 0.95, s * 0.75, 0.3, 0.16, true));
+      parts.push(...P.mirrors(m, 2.6, 1.75, 0.95));
+    }
+    parts.push(...lightBar(m, lights, 2.45, 2.39, 1.5));
+    // The ladder: two chrome rails with rungs, on posts above the body.
+    const ly = 2.36, lz = 0.42;
+    for (const s of [1, -1]) parts.push(box(m.alloy, 3.2, 0.12, 0.07, 0.02, [-0.55, ly, s * lz]));
+    for (let x = -2.0; x <= 0.95; x += 0.26) parts.push(rod(m.alloy, [x, ly, -lz], [x, ly, lz], 0.03));
+    for (const x of [-1.9, 0.8]) for (const s of [1, -1]) parts.push(box(m.trim, 0.08, 0.36, 0.08, 0, [x, 2.16, s * lz]));
+    parts.push(cyl(m.gunmetal, 0.18, 0.5, 'z', [-2.25, 2.12, 0]));
+    // Front: big grille, bumper, siren speaker.
+    parts.push(...P.grille(m, 2.93, 1.15, 0.5, 1.0, 5));
+    parts.push(box(m.chrome, 0.2, 0.24, 2.05, 0.08, [3.0, 0.62, 0]));
+    parts.push(cyl(m.chrome, 0.08, 0.06, 'x', [3.1, 0.62, 0.45]), cyl(m.grille, 0.06, 0.07, 'x', [3.1, 0.62, 0.45]));
+    parts.push(box(m.trim, 0.16, 0.18, 2.0, 0.04, [-2.95, 0.6, 0]));
+    parts.push(...P.plate(m, -2.95, 0.82, -1), ...P.handles(m, loft, [[1.6, 1.32]]));
+    return {
+      node: group(parts, 'body'), panel: path, loft, tick: lights.tick,
+      stripes: [[[1.2, 2.395], [2.2, 2.395]]],
+    };
+  },
+};
+
+export const police: BodyStyle = {
+  id: 'police', wheelRadius: 0.38, wheelbase: 2.8, track: 1.42, wheelWidth: 0.4,
+  seat: [-0.05, 0.66, 0.3], driverScale: 0.82,
+  hood: A(1.45, 0.99, 0.9), nose: A(2.3, 0.42, 1.6), roof: A(-0.78, 1.53, 1.1), deck: A(-2.0, 0.99, 1.5), tail: A(-2.3, 0.32, 1.4),
+  build(m, R) {
+    const halfW = 0.88;
+    const wellR = Math.min(R + 0.07, 0.54);
+    const wells = [1.4, -1.4];
+    const path = sideOutline(2.25, -2.25, 0.34, wells, 0.38, wellR, (p) => {
+      p.l(-2.3, 0.42).l(-2.32, 0.85).q(-2.12, 0.98, -2.3, 0.96).l(0.8, 1.0)
+        .q(2.12, 0.9, 1.6, 1.0).q(2.3, 0.66, 2.28, 0.86).l(2.3, 0.42).l(2.26, 0.34);
+    });
+    const loft = P.shell(m, path, { halfW, shoulder: 0.72, topExp: 3.2, lowExp: 4, cornerF: 0.18, cornerR: 0.2, flare: 0.02, wells, wellR });
+    const lights = beacons();
+    const parts: O[] = [loft.mesh, P.panelLines(loft, [0.8, -0.38, -1.42], 0.3, 1.0)];
+    // Four doors: white panels with a gold star on the front ones.
+    const b = loft.outline.bounds(), scale = 200;
+    const livery = (mirror: boolean) => {
+      const el = canvas(Math.round(b.width * scale), Math.round(b.height * scale), (c, W, H) => {
+        if (mirror) { c.translate(W, 0); c.scale(-1, 1); }
+        c.translate(0, H); c.scale(scale, -scale); c.translate(-b.minX, -b.minY);
+        tracePath(c, loft.outline); c.clip();
+        c.fillStyle = '#f7f7f7';
+        c.beginPath(); c.roundRect(-1.42, 0.44, 2.22, 0.56, 0.06); c.fill();
+        if (!mirror) { c.save(); c.translate(0.2, 0.7); c.scale(1, -1); star(c, 0, 0, 0.13); c.restore(); }
+        else { c.save(); c.translate(0.2, 0.7); c.scale(-1, -1); star(c, 0, 0, 0.13); c.restore(); }
+        c.fillStyle = '#e8b21c'; c.fill();
+        c.strokeStyle = '#8a6400'; c.lineWidth = 0.012; c.stroke();
+      });
+      const t = new THREE.CanvasTexture(el);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      return t;
+    };
+    parts.push(loft.decal(livery(false), livery(true), b, 0.004, 3, (map) =>
+      new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -3 })));
+    parts.push(...P.greenhouse(m, [-1.5, 0.98], [-0.95, 1.5], [0.15, 1.5], [0.8, 0.99], 1.46, [-0.4]));
+    parts.push(...lightBar(m, lights, -0.25, 1.52, 1.15));
+    for (const s of [1, -1]) {
+      parts.push(P.rectLamp(m, 2.2, loft.topY(2.2, 0.55) - 0.02, s * 0.55, 0.12, 0.36, 0.7));
+      parts.push(...P.tailLamp(m, -2.31, 0.78, s * 0.52, 0.12, 0.42));
+      // Push bar and a door-pillar spotlight.
+      parts.push(rod(m.plastic, [2.32, 0.3, s * 0.42], [2.42, 0.78, s * 0.42], 0.035));
+      parts.push(box(lights.red, 0.04, 0.05, 0.12, 0.015, [2.3, 0.58, s * 0.66]));
+    }
+    parts.push(rod(m.plastic, [2.42, 0.78, -0.45], [2.42, 0.78, 0.45], 0.035), rod(m.plastic, [2.38, 0.45, -0.5], [2.38, 0.45, 0.5], 0.035));
+    parts.push(cyl(m.chrome, 0.06, 0.09, 'x', [0.72, 1.06, 0.8]));
+    parts.push(...P.grille(m, 2.27, 0.58, 0.14, 0.62, 3));
+    parts.push(capsule(m.chrome, 0.05, 1.7, 'z', [2.28, 0.38, 0]), capsule(m.chrome, 0.05, 1.7, 'z', [-2.3, 0.4, 0]));
+    parts.push(...P.plate(m, -2.31, 0.58, -1), ...P.plate(m, 2.3, 0.3, 1));
+    parts.push(...P.handles(m, loft, [[0.55, 0.86], [-0.6, 0.86]]), ...P.mirrors(m, 0.75, 1.03, 0.8));
+    parts.push(...P.exhaust(m, -2.3, 0.24, [0.5]));
+    return {
+      node: group(parts, 'body'), panel: path, loft, tick: lights.tick,
+      stripes: [[[0.85, 1.0], [1.4, 0.99], [1.85, 0.95], [2.15, 0.85]], [[-2.05, 0.985], [-1.55, 0.99]]],
+    };
+  },
+};
+
+export const bodies: BodyStyle[] = [muscle, sports, formula, pickup, offroad, monster, bus, firetruck, police];
+/** Bodies with lights and a siren instead of a horn. */
+export const emergency = new Set(['firetruck', 'police']);
 export const airfoil = P.airfoil;
