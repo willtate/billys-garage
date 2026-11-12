@@ -14,6 +14,8 @@
 | 2 | Bar (Labo) | Still placeholder geometry: no arches or livery; tiny driver face; mid-lap shot looked broken |
 | 3 | **Ours** | (said of Labo) Abstract look-alike parts, no visible goal or GO payoff, washed-out world |
 | 4 | **Ours** (new judge, unseen Labo shots) | (said of Labo) Black-silhouette parts trays, text a toddler can't read, small driver |
+| 5 (new bar: Hot Wheels Unlimited) | **Ours** (realism 5 vs 6, parts 8 vs 2, garage 9 vs 1, toddler 8 vs 3) | (said of ours) Cars still look like plastic toys: slab sides, big cartoon drivers |
+| 5b (fresh judge, letters swapped) | **Ours** (realism 6 vs 7, parts 8 vs 2, garage 9 vs 1, toddler 9 vs 3) | (said of ours) Still toy-like next to die-cast detail: flat panels, cartoon drivers |
 
 ## Log
 
@@ -50,6 +52,17 @@
   - Fixed: pinch is ignored while the car is driving.
   - Changed: a fresh start is now a blue racer (was red).
 
+- **Round 5 build (Billy's ask: more realistic cars, more swappable parts, a garage):**
+  - New bar: *Hot Wheels Unlimited* (App Store id 1523486249), screenshots in `gauntlet/bar_hw/`.
+  - Bodies are now drawn side outlines with wheel wells, extruded with rounded edges, under a tinted glass cabin with a roof and window frames: muscle car, sports car, formula racer, pickup, off-roader, monster truck and school bus.
+  - Real-looking wheels: treaded tyres with rounded sidewalls and 8 rims (alloy, chrome, mesh, gold racing, beadlock off-road, whitewall, wire, glow).
+  - Eight picture-only tabs: body, wheels, paint, stickers, engine (blower, scoop, velocity stacks, vents), front (bull bar, splitter, fog lights, snow plough), roof (police lights, LED light bar, roof rack, beacon), back (ducktail, GT wing, rockets, exhaust stacks).
+  - Stickers (flames, lightning, stripes, checker, race number) are drawn to fit each body's side and dodge the wheel wells.
+  - The outdoor park became a workshop: block walls, pegboard of tools, workbench, red tool chest, roll-up door, tyre stacks, oil drums, cones, a painted test track and a shiny concrete floor.
+  - After the first verdict: dark wheel-well liners, side creases, smaller in-proportion driver heads, darker reflective glass.
+  - Default car is now a blue muscle car with white racing stripes. Cartoon parts (donut wheels, crown, googly eyes) were dropped for realism.
+
 ## Known gaps worth another loop
+- Realism is still our weakest score (6 vs 7): flat panels and cartoon drivers next to die-cast detail. Next step would be curved body sides, recessed headlights with lenses, and a less cartoony driver.
 - Not yet judged: sound. Audio can't be heard from the simulator here; it needs a listen on a real iPad.
 - No app icon yet (blank placeholder on the home screen).

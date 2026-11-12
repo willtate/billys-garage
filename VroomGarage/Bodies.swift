@@ -171,6 +171,26 @@ enum Parts {
         return nodes
     }
 
+    /// Dark liners inside each wheel well so the arches have depth instead of showing painted cut faces.
+    static func wellLiners(_ m: CarMaterials, xs: [CGFloat], y: CGFloat, r: CGFloat, bottom: CGFloat, depth: CGFloat) -> [SCNNode] {
+        let dy = bottom - y
+        guard abs(dy) < r else { return [] }
+        let a0 = asin(dy / r)
+        return xs.map { x in
+            let arc = UIBezierPath(arcCenter: CGPoint(x: x, y: y), radius: r - 0.005, startAngle: a0, endAngle: .pi - a0, clockwise: true)
+            arc.addArc(withCenter: CGPoint(x: x, y: y), radius: r - 0.045, startAngle: .pi - a0, endAngle: a0, clockwise: false)
+            arc.close()
+            return extrude(arc, depth: depth, chamfer: 0, m.grille)
+        }
+    }
+
+    /// A raised crease along both flat sides that catches the light and breaks up the slab.
+    static func characterLine(_ m: CarMaterials, from x0: Float, to x1: Float, y: Float, z: Float) -> [SCNNode] {
+        [Float(1), -1].map { s in
+            boxNode(m.paint, CGFloat(x1 - x0), 0.035, 0.03, r: 0.012, at: V((x0 + x1) / 2, y, s * (z + 0.004)))
+        }
+    }
+
     static func roundLamp(_ m: CarMaterials, x: Float, y: Float, z: Float, r: CGFloat, lens: SCNMaterial? = nil) -> [SCNNode] {
         [torusNode(m.chrome, ring: r, pipe: r * 0.22, axis: .x, at: V(x, y, z)),
          sphereNode(lens ?? m.headlight, r: r * 0.95, at: V(x - Float(r) * 0.25, y, z), scale: V(0.4, 1, 1))]
@@ -253,6 +273,8 @@ extension Catalog {
             p.q(2.0, 0.88, 1.45, 0.98); p.q(2.19, 0.66, 2.17, 0.84); p.l(2.19, 0.4); p.l(2.13, 0.34)
         }
         var parts = [extrude(path, depth: halfW * 2, chamfer: 0.11, m.paint)]
+        parts += Parts.wellLiners(m, xs: [1.35, -1.35], y: 0.38, r: wellR, bottom: 0.34, depth: halfW * 2 - 0.16)
+        parts += Parts.characterLine(m, from: -1.95, to: 1.95, y: 0.885, z: Float(halfW))
         parts += Parts.greenhouse(m, rear0: CGPoint(x: -1.6, y: 0.97), rear1: CGPoint(x: -0.55, y: 1.46),
                                   front1: CGPoint(x: 0.05, y: 1.46), front0: CGPoint(x: 0.68, y: 0.97),
                                   width: 1.42, pillars: [-0.2])
@@ -287,6 +309,7 @@ extension Catalog {
             p.q(1.8, 0.86, 1.25, 0.94); p.q(2.25, 0.42, 2.15, 0.76); p.l(2.24, 0.36); p.l(2.19, 0.3)
         }
         var parts = [extrude(path, depth: halfW * 2, chamfer: 0.12, m.paint)]
+        parts += Parts.wellLiners(m, xs: [1.325, -1.325], y: 0.37, r: wellR, bottom: 0.3, depth: halfW * 2 - 0.16)
         parts += Parts.greenhouse(m, rear0: CGPoint(x: -1.35, y: 0.91), rear1: CGPoint(x: -0.55, y: 1.26),
                                   front1: CGPoint(x: -0.05, y: 1.27), front0: CGPoint(x: 0.85, y: 0.90), width: 1.36)
         for s: Float in [1, -1] {
@@ -367,6 +390,8 @@ extension Catalog {
             p.q(2.35, 1.12, 1.7, 1.22); p.q(2.5, 0.92, 2.48, 1.08); p.l(2.5, 0.52); p.l(2.43, 0.47)
         }
         var parts = [extrude(path, depth: halfW * 2, chamfer: 0.12, m.paint)]
+        parts += Parts.wellLiners(m, xs: [1.5, -1.5], y: 0.44, r: wellR, bottom: 0.47, depth: halfW * 2 - 0.16)
+        parts += Parts.characterLine(m, from: -2.25, to: 2.3, y: 1.06, z: Float(halfW))
         parts += Parts.greenhouse(m, rear0: CGPoint(x: -0.82, y: 1.21), rear1: CGPoint(x: -0.76, y: 1.86),
                                   front1: CGPoint(x: 0.22, y: 1.86), front0: CGPoint(x: 0.82, y: 1.21),
                                   width: 1.62, pillars: [-0.28])
@@ -406,6 +431,8 @@ extension Catalog {
             p.q(2.08, 1.15, 2.07, 1.25); p.l(2.09, 0.55); p.l(2.05, 0.5)
         }
         var parts = [extrude(path, depth: halfW * 2, chamfer: 0.1, m.paint)]
+        parts += Parts.wellLiners(m, xs: [1.275, -1.275], y: 0.46, r: wellR, bottom: 0.5, depth: halfW * 2 - 0.16)
+        parts += Parts.characterLine(m, from: -1.95, to: 1.95, y: 1.19, z: Float(halfW))
         parts += Parts.greenhouse(m, rear0: CGPoint(x: -2.0, y: 1.28), rear1: CGPoint(x: -1.96, y: 1.94),
                                   front1: CGPoint(x: 0.42, y: 1.94), front0: CGPoint(x: 0.78, y: 1.28),
                                   width: 1.64, pillars: [-0.35, -1.25])
@@ -460,6 +487,8 @@ extension Catalog {
             p.q(2.15, 1.9, 1.6, 1.98); p.q(2.3, 1.7, 2.28, 1.85); p.l(2.3, 1.3); p.l(2.25, 1.25)
         }
         var parts = [extrude(path, depth: halfW * 2, chamfer: 0.12, m.paint)]
+        parts += Parts.wellLiners(m, xs: [1.2, -1.2], y: 0.85, r: wellR, bottom: 1.25, depth: halfW * 2 - 0.16)
+        parts += Parts.characterLine(m, from: -2.1, to: 2.15, y: 1.89, z: Float(halfW))
         parts += Parts.greenhouse(m, rear0: CGPoint(x: -0.95, y: 1.97), rear1: CGPoint(x: -0.88, y: 2.55),
                                   front1: CGPoint(x: 0.05, y: 2.55), front0: CGPoint(x: 0.6, y: 1.97), width: 1.5)
         // chassis, axles, shocks
@@ -502,6 +531,7 @@ extension Catalog {
             p.q(2.8, 1.2, 2.78, 1.3); p.l(2.8, 0.54); p.l(2.76, 0.5)
         }
         var parts = [extrude(path, depth: halfW * 2, chamfer: 0.12, m.paint)]
+        parts += Parts.wellLiners(m, xs: [1.7, -1.7], y: 0.46, r: wellR, bottom: 0.5, depth: halfW * 2 - 0.16)
         parts += Parts.greenhouse(m, rear0: CGPoint(x: -2.73, y: 1.30), rear1: CGPoint(x: -2.72, y: 2.12),
                                   front1: CGPoint(x: 2.6, y: 2.12), front0: CGPoint(x: 2.78, y: 1.30),
                                   width: 1.82, pillars: [-1.95, -1.15, -0.35, 0.45, 1.25, 2.0])

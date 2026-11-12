@@ -35,7 +35,7 @@ enum Driver {
         let head = SCNNode()
         head.name = "head"
         head.position = V(0, 0.64, 0)
-        head.scale = V(1.22, 1.22, 1.22)   // big friendly bobble-head
+        head.scale = V(1.0, 1.0, 1.0)   // friendly but in proportion
         root.addChildNode(head)
 
         head.addChildNode(sphereNode(skin, r: 0.2, at: V(0, 0, 0)))

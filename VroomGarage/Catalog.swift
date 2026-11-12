@@ -89,11 +89,11 @@ final class CarMaterials {
     let glass: SCNMaterial = {
         let g = SCNMaterial()
         g.lightingModel = .blinn
-        g.diffuse.contents = UIColor(red: 0.10, green: 0.16, blue: 0.22, alpha: 0.42)
+        g.diffuse.contents = UIColor(red: 0.08, green: 0.13, blue: 0.18, alpha: 0.58)
         g.specular.contents = UIColor(white: 1, alpha: 1)
         g.shininess = 80
         g.reflective.contents = studioEnvironment
-        g.reflective.intensity = 0.45
+        g.reflective.intensity = 0.7
         g.fresnelExponent = 1.4
         g.transparencyMode = .aOne
         g.blendMode = .alpha
