@@ -89,11 +89,11 @@ final class CarMaterials {
     let glass: SCNMaterial = {
         let g = SCNMaterial()
         g.lightingModel = .blinn
-        g.diffuse.contents = UIColor(red: 0.08, green: 0.13, blue: 0.18, alpha: 0.58)
+        g.diffuse.contents = UIColor(red: 0.03, green: 0.05, blue: 0.08, alpha: 0.9)
         g.specular.contents = UIColor(white: 1, alpha: 1)
-        g.shininess = 80
+        g.shininess = 90
         g.reflective.contents = studioEnvironment
-        g.reflective.intensity = 0.7
+        g.reflective.intensity = 0.95
         g.fresnelExponent = 1.4
         g.transparencyMode = .aOne
         g.blendMode = .alpha
@@ -124,6 +124,40 @@ final class CarMaterials {
                                      emission: UIColor(red: 0.85, green: 0.02, blue: 0.02, alpha: 1))
     let amber = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1), rough: 0.15,
                                  emission: UIColor(red: 0.8, green: 0.35, blue: 0.0, alpha: 1))
+
+    /// Polished lamp reflector: bright silver with a faint glow so lamps read as lit.
+    let reflector = SCNMaterial.pbr(UIColor(white: 0.92, alpha: 1), metal: 1.0, rough: 0.3,
+                                    emission: UIColor(white: 0.32, alpha: 1))
+    /// Clear lamp cover glass: mostly see-through, with a bright reflection.
+    let lens: SCNMaterial = {
+        let g = SCNMaterial()
+        g.lightingModel = .blinn
+        g.diffuse.contents = UIColor(white: 1, alpha: 0.1)
+        g.specular.contents = UIColor.white
+        g.shininess = 120
+        g.reflective.contents = studioEnvironment
+        g.reflective.intensity = 0.55
+        g.fresnelExponent = 1.8
+        g.transparencyMode = .aOne
+        g.blendMode = .alpha
+        g.writesToDepthBuffer = false
+        return g
+    }()
+    /// Deep red tail-lamp cover over a brighter glowing core.
+    let tailLens: SCNMaterial = {
+        let g = SCNMaterial()
+        g.lightingModel = .blinn
+        g.diffuse.contents = UIColor(red: 0.75, green: 0.02, blue: 0.04, alpha: 0.72)
+        g.emission.contents = UIColor(red: 0.35, green: 0.0, blue: 0.0, alpha: 1)
+        g.specular.contents = UIColor.white
+        g.shininess = 100
+        g.reflective.contents = studioEnvironment
+        g.reflective.intensity = 0.35
+        g.fresnelExponent = 1.6
+        g.transparencyMode = .aOne
+        g.blendMode = .alpha
+        return g
+    }()
 
     /// Racing stripes: white on dark paint, near-black on light paint.
     let stripe = SCNMaterial.pbr(.white, rough: 0.3, clearCoat: true)

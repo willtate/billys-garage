@@ -14,6 +14,12 @@ enum Stickers {
             for run in shell.stripes { stripeRun(run, m: m).forEach { root.addChildNode($0) } }
         }
         let b = shell.panel.bounds
+        if let loft = shell.loft {
+            guard let r = art(id, shell: shell, paint: m.current, number: numbers[bodyID] ?? "1", mirror: false),
+                  let l = art(id, shell: shell, paint: m.current, number: numbers[bodyID] ?? "1", mirror: true) else { return root }
+            root.addChildNode(loft.decal(r, l, rect: b, offset: 0.006, order: 5))
+            return root
+        }
         for side: Float in [1, -1] {
             guard let img = art(id, shell: shell, paint: m.current, number: numbers[bodyID] ?? "1", mirror: side < 0) else { continue }
             let plane = SCNPlane(width: b.width, height: b.height)
@@ -71,7 +77,7 @@ enum Stickers {
 
             switch id {
             case "flames":
-                drawFlames(c, front: b.maxX, length: L, yLo: b.minY + H * 0.22, yHi: b.minY + H * 0.82)
+                drawFlames(c, front: b.maxX - 0.12, length: L, yLo: b.minY + H * 0.3, yHi: b.minY + H * 0.74)
             case "lightning":
                 let bolt = UIBezierPath()
                 let x0 = b.maxX - 0.15, x1 = b.minX + 0.2
@@ -154,7 +160,7 @@ enum Stickers {
             let yTip = yHi - H * (0.08 + 0.84 * t)
             let reach = L * (0.42 + 0.22 * sin(CGFloat(i) * 2.1 + 0.5))
             let tip = CGPoint(x: front - reach, y: yTip + H * 0.05)
-            let valley = CGPoint(x: front - L * 0.2, y: yHi - H * (0.08 + 0.84 * (t + 0.5 / CGFloat(tongues - 1))))
+            let valley = CGPoint(x: front - L * 0.1, y: yHi - H * (0.08 + 0.84 * (t + 0.5 / CGFloat(tongues - 1))))
             p.addQuadCurve(to: tip, controlPoint: CGPoint(x: front - reach * 0.55, y: yTip + H * 0.2))
             if i < tongues - 1 {
                 p.addQuadCurve(to: valley, controlPoint: CGPoint(x: front - reach * 0.6, y: yTip - H * 0.02))

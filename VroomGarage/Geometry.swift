@@ -140,3 +140,21 @@ func capsuleNode(_ m: SCNMaterial, r: CGFloat, h: CGFloat, axis: Axis = .y, at p
     n.position = p
     return n
 }
+
+/// Soft dark patch that sits under a car so it looks planted on the floor.
+let contactShadowImage: UIImage = {
+    let w = 256, h = 128
+    var px = [UInt8](repeating: 0, count: w * h * 4)
+    for y in 0..<h {
+        for x in 0..<w {
+            let u = abs(Float(x) / Float(w - 1) * 2 - 1), v = abs(Float(y) / Float(h - 1) * 2 - 1)
+            let d = pow(pow(u, 4) + pow(v, 4), 0.25)
+            let t = max(0, min(1, (d - 0.45) / 0.55))
+            let a = 0.62 * (1 - t * t * (3 - 2 * t))
+            px[(y * w + x) * 4 + 3] = UInt8(a * 255)
+        }
+    }
+    let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    return UIImage(cgImage: ctx.makeImage()!)
+}()

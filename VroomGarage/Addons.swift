@@ -76,10 +76,10 @@ extension Catalog {
             return group("addon", p)
         },
         AddonStyle(id: "lip") { m, b in
-            let w = CGFloat(b.nose.width)
-            var p: [SCNNode] = [boxNode(m.trim, 0.36, 0.035, w, r: 0.015, at: V(0.08, -0.14, 0))]
+            let w = CGFloat(b.nose.width) * 0.82
+            var p: [SCNNode] = [boxNode(m.trim, 0.34, 0.035, w, r: 0.015, at: V(-0.07, -0.04, 0))]
             for s: Float in [1, -1] {
-                p.append(boxNode(m.trim, 0.3, 0.12, 0.03, r: 0.01, at: V(0.06, -0.1, s * Float(w) / 2)))
+                p.append(boxNode(m.trim, 0.26, 0.08, 0.03, r: 0.01, at: V(-0.09, -0.01, s * Float(w) / 2)))
             }
             return group("addon", p)
         },

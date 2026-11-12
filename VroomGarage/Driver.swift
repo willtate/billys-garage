@@ -3,82 +3,59 @@ import UIKit
 
 /// A friendly little driver who sits in every car. Built facing +X with the seat at y = 0.
 enum Driver {
-    static let skin = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.80, blue: 0.64, alpha: 1), rough: 0.6)
-    static let shirt = SCNMaterial.pbr(UIColor(red: 0.20, green: 0.45, blue: 0.95, alpha: 1), rough: 0.6)
-    static let dark = SCNMaterial.pbr(UIColor(white: 0.08, alpha: 1), rough: 0.3)
-    static let cheek = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.55, blue: 0.6, alpha: 1), rough: 0.7)
-    static let mouth = SCNMaterial.pbr(UIColor(red: 0.55, green: 0.1, blue: 0.12, alpha: 1), rough: 0.5)
-    static let visor = SCNMaterial.pbr(UIColor(red: 0.15, green: 0.2, blue: 0.3, alpha: 1), metal: 0.4, rough: 0.1)
+    static let suit = SCNMaterial.pbr(UIColor(red: 0.10, green: 0.14, blue: 0.24, alpha: 1), rough: 0.7)
+    static let glove = SCNMaterial.pbr(UIColor(white: 0.1, alpha: 1), rough: 0.55)
+    static let dark = SCNMaterial.pbr(UIColor(white: 0.06, alpha: 1), rough: 0.35)
+    static let visor = SCNMaterial.pbr(UIColor(red: 0.08, green: 0.12, blue: 0.2, alpha: 1), metal: 0.85, rough: 0.06, clearCoat: true)
 
     static func make(_ m: CarMaterials) -> SCNNode {
         let root = SCNNode()
         root.name = "driver"
 
+        // Racing suit: torso, shoulders with white piping.
         let torso = SCNNode(geometry: SCNCapsule(capRadius: 0.17, height: 0.5))
-        torso.geometry?.materials = [shirt]
+        torso.geometry?.materials = [suit]
         torso.position = V(0, 0.25, 0)
+        torso.scale = V(0.9, 1, 1.05)
         root.addChildNode(torso)
+        root.addChildNode(boxNode(m.white, 0.05, 0.3, 0.02, r: 0.01, at: V(0.15, 0.27, 0.07)))
+        root.addChildNode(torusNode(dark, ring: 0.085, pipe: 0.035, at: V(0, 0.5, 0)))   // neck collar
 
-        // Hands on a steering wheel
-        let wheel = torusNode(dark, ring: 0.13, pipe: 0.025, at: V(0.3, 0.42, 0))
+        // Steering wheel with a hub, and gloved hands at ten-to-two.
+        let wheel = SCNNode()
+        wheel.position = V(0.32, 0.42, 0)
         wheel.eulerAngles = V(0, 0, -1.2)
+        wheel.addChildNode(torusNode(dark, ring: 0.13, pipe: 0.022, at: V(0, 0, 0)))
+        wheel.addChildNode(cylNode(m.gunmetal, r: 0.04, h: 0.03, at: V(0, 0, 0)))
+        wheel.addChildNode(boxNode(m.gunmetal, 0.22, 0.012, 0.03, at: V(0, 0, 0)))
         root.addChildNode(wheel)
         for side: Float in [1, -1] {
             let arm = SCNNode(geometry: SCNCapsule(capRadius: 0.05, height: 0.32))
-            arm.geometry?.materials = [shirt]
+            arm.geometry?.materials = [suit]
             arm.position = V(0.16, 0.38, side * 0.12)
             arm.eulerAngles = V(0, 0, -1.15)
             root.addChildNode(arm)
-            root.addChildNode(sphereNode(skin, r: 0.05, at: V(0.3, 0.44, side * 0.11)))
+            root.addChildNode(sphereNode(glove, r: 0.048, at: V(0.31, 0.47, side * 0.1), scale: V(1, 0.9, 1.1)))
         }
 
+        // Full-face helmet in the car's colour, with a dark wraparound visor.
         let head = SCNNode()
         head.name = "head"
-        head.position = V(0, 0.64, 0)
-        head.scale = V(1.0, 1.0, 1.0)   // friendly but in proportion
+        head.position = V(0, 0.66, 0)
         root.addChildNode(head)
+        head.addChildNode(sphereNode(m.paint, r: 0.2, at: V(0, 0, 0), scale: V(1.06, 1, 0.95)))
+        head.addChildNode(sphereNode(visor, r: 0.185, at: V(0.035, 0.0, 0), scale: V(1.0, 0.44, 0.92)))
+        // chin bar and white crown stripe
+        head.addChildNode(sphereNode(m.paint, r: 0.15, at: V(0.06, -0.085, 0), scale: V(1, 0.7, 1.05)))
+        head.addChildNode(torusNode(m.white, ring: 0.198, pipe: 0.012, axis: .z, at: V(0, 0.0, 0)))
+        head.addChildNode(boxNode(dark, 0.05, 0.02, 0.06, r: 0.008, at: V(0.2, -0.11, 0)))   // chin vent
 
-        head.addChildNode(sphereNode(skin, r: 0.2, at: V(0, 0, 0)))
-        // Helmet in the car's paint colour, with a white stripe and a visor brim.
-        let helmet = sphereNode(m.paint, r: 0.215, at: V(-0.02, 0.05, 0), scale: V(1, 0.82, 1))
-        head.addChildNode(helmet)
-        head.addChildNode(boxNode(m.white, 0.36, 0.05, 0.08, r: 0.02, at: V(-0.05, 0.235, 0)))
-        // Face: covers the front of the head below the helmet
-        head.addChildNode(sphereNode(skin, r: 0.19, at: V(0.025, -0.02, 0)))
-
-        for side: Float in [1, -1] {
-            let eye = sphereNode(dark, r: 0.045, at: V(0.175, 0.01, side * 0.08), scale: V(0.6, 1.2, 1))
-            eye.name = "eye"
-            head.addChildNode(eye)
-            head.addChildNode(sphereNode(m.white, r: 0.016, at: V(0.2, 0.035, side * 0.07)))
-            head.addChildNode(sphereNode(cheek, r: 0.04, at: V(0.165, -0.07, side * 0.12), scale: V(0.5, 0.8, 1)))
-        }
-
-        // Big smile: a half-disc facing forward
-        let path = UIBezierPath(arcCenter: .zero, radius: 0.085, startAngle: 0, endAngle: .pi, clockwise: false)
-        path.close()
-        path.flatness = 0.004
-        let smileShape = SCNShape(path: path, extrusionDepth: 0.02)
-        let smile = SCNNode(geometry: smileShape)
-        smile.geometry?.materials = [mouth]
-        smile.position = V(0.19, -0.065, 0)
-        smile.eulerAngles = V(0, .pi / 2, 0)
-        head.addChildNode(smile)
-
-        // Bob along to the music, glance around, blink.
+        // Bob along to the engine.
         head.runAction(.repeatForever(.sequence([
-            .moveBy(x: 0, y: 0.03, z: 0, duration: 0.35),
-            .moveBy(x: 0, y: -0.03, z: 0, duration: 0.35),
-            .wait(duration: 0.4),
+            .moveBy(x: 0, y: 0.02, z: 0, duration: 0.35),
+            .moveBy(x: 0, y: -0.02, z: 0, duration: 0.35),
+            .wait(duration: 0.5),
         ])))
-        let blink = SCNAction.sequence([
-            .wait(duration: 2.6, withRange: 2.0),
-            .customAction(duration: 0.12) { node, t in
-                let k = Float(abs(t / 0.06 - 1))
-                node.childNodes.filter { $0.name == "eye" }.forEach { $0.scale.y = 1.15 * max(0.1, k) }
-            },
-        ])
-        head.runAction(.repeatForever(blink))
         return root
     }
 

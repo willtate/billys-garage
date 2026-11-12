@@ -71,6 +71,25 @@ enum CarBuilder {
             }
         }
 
+        // Soft contact shadow so the car sits on the floor rather than hovering over it.
+        let shadowLen = CGFloat(body.wheelbase + radius * 2 + 0.9)
+        let shadowWid = CGFloat(halfTrack * 2 + width + 0.5)
+        let plane = SCNPlane(width: shadowLen, height: shadowWid)
+        let sm = SCNMaterial()
+        sm.lightingModel = .constant
+        sm.diffuse.contents = UIColor.black
+        sm.transparent.contents = contactShadowImage
+        sm.transparencyMode = .aOne
+        sm.writesToDepthBuffer = false
+        plane.materials = [sm]
+        let shadow = SCNNode(geometry: plane)
+        shadow.name = "contactShadow"
+        shadow.eulerAngles.x = -.pi / 2
+        shadow.position = V(0, 0.008, 0)
+        shadow.renderingOrder = -1
+        shadow.castsShadow = false
+        root.addChildNode(shadow)
+
         let tail = V(body.tail.p.x - 0.1, body.tail.p.y + lift, 0)
         return BuiltCar(root: root, body: bodyNode, wheelMounts: mounts, spinners: spinners,
                         addons: addons, sticker: sticker, driver: driver, tailpipe: tail)
