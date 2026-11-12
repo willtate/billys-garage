@@ -1,7 +1,7 @@
 // Offline support. The page itself is fetched fresh whenever there's a connection (so new
 // deploys arrive), falling back to the saved copy offline. Built files have content hashes in
 // their names, so once saved they never need fetching again.
-const CACHE = 'billys-garage-v1';
+const CACHE = 'billys-garage-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -28,11 +28,16 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Page and everything else: network first, saved copy when offline.
+  // Page and everything else: network first, saved copy when offline — or when the server
+  // answers with an error (a broken deploy shouldn't replace a working app with an error page).
   const key = e.request.mode === 'navigate' ? '/' : e.request;
-  e.respondWith(fetch(e.request).then((res) => {
-    const copy = res.clone();
-    if (res.ok) caches.open(CACHE).then((c) => c.put(key, copy));
-    return res;
-  }).catch(() => caches.match(key).then((hit) => hit || Response.error())));
+  const saved = () => caches.match(key);
+  e.respondWith(fetch(e.request).then(async (res) => {
+    if (res.ok) {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(key, copy));
+      return res;
+    }
+    return (await saved()) || res;
+  }).catch(async () => (await saved()) || Response.error()));
 });
