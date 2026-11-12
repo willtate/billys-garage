@@ -83,3 +83,10 @@ Blind verdicts vs Hot Wheels Unlimited (realism / parts / garage / toddler):
 - Realism score did not move (judges vary 4–6). Several judge suggestions were already present (shadow, lens/reflector, discs), so the details may not read at full-screen scale.
 
 Next realism ideas: paint that reflects the actual garage (cube map of the workshop), a much stronger contact/occlusion shadow, sidewall lettering, smaller blower.
+
+## Round 7: reflections and grounding (2026-11-12)
+- At startup the app captures a cube map of the workshop from the car's position and uses it as the lighting environment, and for glass and lens reflections. Side faces get a shop-light band and a darker floor, so a horizon line shows on the flanks. The ceiling face is drawn with fluorescent panels. Paint is glossier (roughness 0.14).
+- Gotcha: every cube face must be the same pixel size. UIGraphicsImageRenderer defaults to screen scale (2x), and mixing 256 px and 512 px faces made SceneKit silently drop the whole environment. Use a format with scale = 1.
+- Darker, tighter contact shadow. Blower is 20% smaller (scaled through an inner node, so the pop-in animation doesn't reset it).
+- Blind verdict, ours = A: realism 4, parts 8, garage 8, toddler 8, vs bar 7/4/2/4. Winner: ours.
+- Over three judges realism stayed at 4–5 while parts, garage and toddler fit stayed far ahead. The judges keep asking for features we already have (reflections, discs, shadows, lenses). What remains is the art style: soft, rounded forms in saturated colours read as "toy", next to the bar's photographic die-cast renders. Closing that gap needs real modelled car assets (USDZ / glTF made in a 3D tool), not more procedural tweaks.
