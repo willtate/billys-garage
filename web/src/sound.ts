@@ -2,7 +2,7 @@
 // files to download. Browsers only allow sound after the first touch, so `unlock` must be called
 // from a touch handler.
 
-export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk';
+export type Effect = 'pop' | 'click' | 'honk' | 'vroom' | 'sparkle' | 'boing' | 'clunk' | 'bubbles' | 'brush' | 'spray';
 
 const SR = 44100;
 const TAU = Math.PI * 2;
@@ -72,6 +72,44 @@ const recipes: Record<Effect, () => AudioBuffer> = {
       else if (t > 0.24 && t < 0.6) on = Math.min(1, (t - 0.24) / 0.01) * Math.min(1, (0.6 - t) / 0.04);
       const raw = Math.sin(TAU * 392 * t) + 0.8 * Math.sin(TAU * 494 * t) + 0.3 * Math.sin(TAU * 784 * t);
       d[i] = Math.tanh(raw * 2.2) * on * 0.32;
+    }
+  }),
+  // Car wash: lots of little bubble blips.
+  bubbles: () => make(1.9, (d, n) => {
+    const r = lcg(4242);
+    const pops: [number, number][] = [];
+    for (let k = 0; k < 34; k++) pops.push([((r() + 1) / 2) * 1.75, 500 + ((r() + 1) / 2) * 900]);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      let s = 0;
+      for (const [t0, f] of pops) {
+        const dt = t - t0;
+        if (dt < 0 || dt > 0.09) continue;
+        s += Math.sin(TAU * f * dt * (1 + dt * 18)) * Math.exp(-dt * 45) * Math.min(1, dt / 0.002);
+      }
+      d[i] = Math.tanh(s * 0.9) * 0.35 * Math.min(1, (1.9 - t) / 0.2);
+    }
+  }),
+  // Spinning brushes: soft swishing noise that pulses with each turn.
+  brush: () => make(1.8, (d, n) => {
+    const noise = lcg(77);
+    let y = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      y += 0.08 * (noise() - y);
+      const pulse = 0.55 + 0.45 * Math.sin(TAU * 6 * t);
+      d[i] = y * 2.6 * pulse * Math.min(1, t / 0.15) * Math.min(1, (1.8 - t) / 0.25);
+    }
+  }),
+  // Rinse: a hissy spray of water.
+  spray: () => make(1.6, (d, n) => {
+    const noise = lcg(31337);
+    let lo = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const x = noise();
+      lo += 0.3 * (x - lo);
+      d[i] = (x - lo) * 0.32 * Math.min(1, t / 0.08) * Math.min(1, (1.6 - t) / 0.3);
     }
   }),
   vroom: () => make(4.7, (d, n) => {

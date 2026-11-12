@@ -32,3 +32,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #1f1f1f; tou
 #go { width: 112px; height: 112px; background: #2bbd4a; font-size: 44px; letter-spacing: 1px; text-shadow: 0 3px 0 rgba(0,0,0,0.25); }
 #horn { width: 84px; height: 84px; background: #ffc61a; font-size: 38px; }
 #go:active, #horn:active { transform: scale(0.92); }
+#wash { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; font-size: 40px; background: #3bb4ff;
+  box-shadow: 0 7px 14px rgba(0,0,0,0.45), inset 0 -8px 12px rgba(0,0,0,0.22), inset 0 6px 10px rgba(255,255,255,0.4); }
+#wash:active { transform: scale(0.92); }
+/* While the car is in the wash, the tray dims so it's clear parts wait. */
+body.washing #tray { opacity: 0.45; transition: opacity 0.3s; }
+#tray { transition: opacity 0.3s; }

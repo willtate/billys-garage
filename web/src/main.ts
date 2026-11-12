@@ -9,12 +9,14 @@ import { wheels } from './wheels';
 import { autoUpdate } from './update';
 import { animate, burst, easeIn, easeOut, smooth, tickAnims, tickBursts } from './fx';
 import { play, unlock } from './sound';
+import { carWash } from './wash';
 import { ROAD_RADIUS } from './garage';
 
 // MARK: Renderer and scene
 
 const view = document.getElementById('view') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas: view, antialias: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas: view, antialias: true, powerPreference: 'high-performance',
+  preserveDrawingBuffer: location.search.includes('at=') });
 // 1.5x is sharp enough on a Retina iPad and draws about half the pixels of 2x.
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.toneMapping = THREE.NeutralToneMapping;
@@ -75,7 +77,7 @@ const q = new URLSearchParams(location.search);
 let design: Design = { body: 'muscle', wheels: 'alloy', paint: 'blue', sticker: 'stripes', engine: 'none', front: 'none', roof: 'none', back: 'none', ...(saved ?? {}) };
 for (const k of ['body', 'wheels', 'paint', 'sticker', ...slots] as const) { const v = q.get(k); if (v) design[k] = v; }
 let car: BuiltCar | null = null;
-let driving = false;
+let driving = false, washing = false;
 
 function swapCar(): BuiltCar {
   if (car) carHolder.remove(car.root);
@@ -95,6 +97,7 @@ function frameCar(c: BuiltCar) {
 }
 
 function apply(next: Design) {
+  if (washing) return; // parts stay put until the car is out of the wash
   const prev = design;
   design = next;
   localStorage.setItem('vroom.design', JSON.stringify(design));
@@ -198,8 +201,19 @@ function exhaust() {
 }
 
 const LAP = 4200;
+function wash() {
+  if (driving || washing || !car) return;
+  washing = true;
+  document.body.classList.add('washing');
+  carWash(carHolder, car.root, car.body, car.driver, materials, () => {
+    washing = false;
+    document.body.classList.remove('washing');
+    hop();
+  });
+}
+
 function vroom() {
-  if (driving || !car) return;
+  if (driving || washing || !car) return;
   driving = true;
   play('vroom');
   const c = car;
@@ -299,6 +313,7 @@ function tapped(e: PointerEvent) {
 
 document.getElementById('go')!.addEventListener('pointerdown', () => vroom());
 document.getElementById('horn')!.addEventListener('pointerdown', () => honk());
+document.getElementById('wash')!.addEventListener('pointerdown', () => wash());
 view.addEventListener('pointercancel', up);
 view.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -470,6 +485,7 @@ if (q.has('icon')) {
 }
 // `?go=<ms>` starts a lap automatically (for checking the drive without touching the screen).
 if (q.has('go')) setTimeout(vroom, Number(q.get('go')) || 500);
+if (q.has('wash')) setTimeout(wash, Number(q.get('wash')) || 500);
 renderCards();
 
 // MARK: Frame loop
@@ -494,7 +510,7 @@ let frames = 0, fpsT = 0;
 // Draw at most 60 times a second (ProMotion screens would otherwise ask for 120), and
 // only 30 while nothing is being touched and the car is just swaying.
 let lastDraw = 0;
-renderer.setAnimationLoop((now) => {
+function drawFrame(now: number) {
   const busy = tickAnims(now) || driving || touching || !!fling;
   if (now - lastDraw < (busy ? 15.5 : 31)) return;
   tickBursts(now, Math.min(0.05, (now - lastDraw) / 1000));
@@ -524,6 +540,22 @@ renderer.setAnimationLoop((now) => {
     if (head) head.position.y = 0.66 + 0.01 * Math.max(0, Math.sin(now / 190));
   }
   renderer.render(scene, camera);
-});
+}
+
+// Dev only: `?at=<ms>` fast-forwards the clock to that moment and freezes there, so screenshots
+// can catch any point of an animation (headless browsers stop drawing frames on their own).
+if (import.meta.env.DEV && q.has('at')) {
+  const until = Number(q.get('at'));
+  {
+    const t0 = performance.now();
+    drawFrame(t0);
+    if (q.has('washnow')) wash();
+    if (q.has('gonow')) vroom();
+    for (let t = t0; t <= t0 + until; t += 16.7) { lastDraw = -1e9; drawFrame(t); }
+    renderer.setAnimationLoop(() => renderer.render(scene, camera)); // keep presenting the frozen frame
+  }
+} else {
+  renderer.setAnimationLoop(drawFrame);
+}
 
 if (import.meta.env.DEV) Object.assign(window, { vg: { THREE, scene, camera, cameraRig, userSpin, autoSpin, materials, renderer, setDistance: (d: number) => { cameraDistance = d; } } });
