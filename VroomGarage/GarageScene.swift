@@ -28,8 +28,8 @@ final class GarageScene {
         scene.lightingEnvironment.contents = sky
         scene.lightingEnvironment.intensity = 1.3
         scene.fogColor = Self.horizon
-        scene.fogStartDistance = 18
-        scene.fogEndDistance = 45
+        scene.fogStartDistance = 20
+        scene.fogEndDistance = 55
 
         // Ground
         let floor = SCNFloor()
@@ -98,6 +98,7 @@ final class GarageScene {
         cameraRig.eulerAngles.x = -0.30
         scene.rootNode.addChildNode(cameraRig)
 
+        scene.rootNode.addChildNode(Scenery.make())
         startAutoSpin()
     }
 
