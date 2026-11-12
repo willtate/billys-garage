@@ -124,7 +124,7 @@ final class SoundFX {
                 }
             }
         case .vroom:
-            return make(2.2) { out, n, sr in
+            return make(4.7) { out, n, sr in
                 var ph = 0.0
                 var sub = 0.0
                 var y = 0.0
@@ -132,9 +132,11 @@ final class SoundFX {
                 for i in 0..<n {
                     let t = Double(i) / sr
                     let f: Double
-                    if t < 0.3 { f = 55 + 150 * (t / 0.3) }                 // rev
-                    else if t < 0.5 { f = 205 - 80 * ((t - 0.3) / 0.2) }      // gear
-                    else { f = 125 + 120 * min(1, (t - 0.5) / 1.1) }          // zoom
+                    if t < 0.3 { f = 55 + 150 * (t / 0.3) }                          // rev
+                    else if t < 0.5 { f = 205 - 80 * ((t - 0.3) / 0.2) }               // clutch
+                    else if t < 1.3 { f = 125 + 110 * ((t - 0.5) / 0.8) }              // go!
+                    else if t < 3.7 { f = 235 + 14 * sin(twoPi * 1.3 * t) }            // cruising the lap
+                    else { f = 235 - 165 * min(1, (t - 3.7) / 0.9) }                   // slow down
                     ph += f / sr
                     sub += f * 0.5 / sr
                     let saw = 2 * (ph - floor(ph)) - 1
@@ -142,8 +144,8 @@ final class SoundFX {
                     noise = noise &* 1664525 &+ 1013904223
                     let nz = Double(noise) / Double(UInt32.max) * 2 - 1
                     let x = saw * 0.5 + subSaw * 0.4 + nz * 0.12
-                    y += 0.22 * (x - y)                                       // soften
-                    let env = min(1, t / 0.04) * (t > 1.7 ? max(0, (2.2 - t) / 0.5) : 1)
+                    y += 0.22 * (x - y)
+                    let env = min(1, t / 0.04) * (t > 4.2 ? max(0, (4.7 - t) / 0.5) : 1)
                     out[i] = Float(tanh(y * 1.8) * env * 0.5)
                 }
             }

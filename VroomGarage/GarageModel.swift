@@ -10,7 +10,7 @@ final class GarageModel: ObservableObject {
     private let thumbnailer = ThumbnailRenderer()
     private var pending = Set<String>()
     private static let storeKey = "savedCar.v1"
-    static let thumbSize: CGFloat = 132
+    static let thumbSize: CGFloat = 160
 
     init() {
         if let data = UserDefaults.standard.data(forKey: Self.storeKey),
@@ -19,8 +19,21 @@ final class GarageModel: ObservableObject {
         } else {
             design = CarDesign()
         }
+        // Screenshot hooks: -vgDesign body,wheels,paint,topper  -vgCategory paint
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-vgDesign"), i + 1 < args.count {
+            let p = args[i + 1].split(separator: ",").map(String.init)
+            if p.count == 4 { design = CarDesign(body: p[0], wheels: p[1], paint: p[2], topper: p[3]) }
+        }
+        if let i = args.firstIndex(of: "-vgCategory"), i + 1 < args.count,
+           let c = PartCategory(rawValue: args[i + 1]) {
+            category = c
+        }
         scene.apply(design, previous: nil)
         SoundFX.shared.warmUp()
+        if args.contains("-vgAutoGo") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.vroom() }
+        }
     }
 
     func update(_ change: (inout CarDesign) -> Void) {

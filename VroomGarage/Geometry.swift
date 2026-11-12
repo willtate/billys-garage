@@ -130,3 +130,13 @@ func verticalGradient(_ top: UIColor, _ bottom: UIColor, size: CGSize = CGSize(w
         ctx.cgContext.drawLinearGradient(grad, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
     }
 }
+
+func capsuleNode(_ m: SCNMaterial, r: CGFloat, h: CGFloat, axis: Axis = .y, at p: SCNVector3) -> SCNNode {
+    let g = SCNCapsule(capRadius: r, height: h)
+    g.radialSegmentCount = 32
+    g.materials = [m]
+    let n = SCNNode(geometry: g)
+    orient(n, axis)
+    n.position = p
+    return n
+}

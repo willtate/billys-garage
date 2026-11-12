@@ -39,8 +39,12 @@ final class CarMaterials {
     let paint = SCNMaterial.pbr(.red, metal: 0.15, rough: 0.32, clearCoat: true)
     let trim = SCNMaterial.pbr(UIColor(white: 0.16, alpha: 1), rough: 0.55)
     let glass: SCNMaterial = {
-        let g = SCNMaterial.pbr(UIColor(red: 0.62, green: 0.86, blue: 1.0, alpha: 1), metal: 0.1, rough: 0.05)
-        g.transparency = 0.38
+        let g = SCNMaterial()
+        g.lightingModel = .blinn
+        g.diffuse.contents = UIColor(red: 0.7, green: 0.9, blue: 1.0, alpha: 0.26)
+        g.specular.contents = UIColor(white: 1, alpha: 1)
+        g.shininess = 60
+        g.transparencyMode = .aOne
         g.blendMode = .alpha
         g.writesToDepthBuffer = false
         return g
@@ -48,7 +52,7 @@ final class CarMaterials {
     let chrome = SCNMaterial.pbr(UIColor(white: 0.95, alpha: 1), metal: 1.0, rough: 0.14)
     let rubber = SCNMaterial.pbr(UIColor(white: 0.10, alpha: 1), rough: 0.8)
     let white = SCNMaterial.pbr(UIColor(white: 0.97, alpha: 1), rough: 0.35)
-    let gold = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.78, blue: 0.22, alpha: 1), metal: 1.0, rough: 0.22)
+    let gold = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.82, blue: 0.2, alpha: 1), metal: 0.55, rough: 0.25, emission: UIColor(red: 0.35, green: 0.25, blue: 0.0, alpha: 1), clearCoat: true)
     let yellow = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.86, blue: 0.1, alpha: 1), rough: 0.3, clearCoat: true)
     let headlight = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.97, blue: 0.85, alpha: 1), rough: 0.1,
                                      emission: UIColor(red: 1.0, green: 0.95, blue: 0.75, alpha: 1))
@@ -109,14 +113,14 @@ enum Catalog {
 
     static let bodies: [BodyStyle] = [
         BodyStyle(id: "racer", wheelRadius: 0.42, wheelbase: 2.4, track: 1.75, wheelWidth: 0.36,
-                  roof: V(-0.15, 1.08, 0), rear: V(-1.55, 0.70, 0), seat: V(-0.2, 0.4, 0), driverScale: 0.75) { m in
+                  roof: V(-0.15, 1.15, 0), rear: V(-1.55, 0.70, 0), seat: V(-0.15, 0.3, 0), driverScale: 0.95) { m in
             group("body", [
                 boxNode(m.paint, 3.5, 0.40, 1.30, r: 0.18, at: V(0, 0.50, 0)),
                 boxNode(m.paint, 1.55, 0.30, 1.72, r: 0.14, at: V(-0.12, 0.46, 0)),
                 boxNode(m.trim, 0.5, 0.06, 1.95, r: 0.03, at: V(1.85, 0.30, 0)),
                 boxNode(m.trim, 0.08, 0.16, 0.06, at: V(1.85, 0.36, 0.5)),
                 boxNode(m.trim, 0.08, 0.16, 0.06, at: V(1.85, 0.36, -0.5)),
-                sphereNode(m.glass, r: 0.5, at: V(-0.15, 0.72, 0), scale: V(1.5, 0.75, 1.0)),
+                sphereNode(m.glass, r: 0.5, at: V(-0.15, 0.7, 0), scale: V(1.6, 0.95, 1.1)),
                 sphereNode(m.headlight, r: 0.1, at: V(1.70, 0.56, 0.42)),
                 sphereNode(m.headlight, r: 0.1, at: V(1.70, 0.56, -0.42)),
                 boxNode(m.taillight, 0.05, 0.1, 0.32, r: 0.02, at: V(-1.76, 0.56, 0.38)),
@@ -128,7 +132,7 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "monster", wheelRadius: 0.75, wheelbase: 2.3, track: 2.0, wheelWidth: 0.55,
-                  roof: V(-0.25, 2.16, 0), rear: V(-1.45, 1.53, 0), seat: V(-0.2, 1.3, 0), driverScale: 0.8) { m in
+                  roof: V(-0.25, 2.16, 0), rear: V(-1.45, 1.53, 0), seat: V(-0.15, 1.22, 0), driverScale: 0.95) { m in
             group("body", [
                 boxNode(m.trim, 2.8, 0.22, 1.0, r: 0.05, at: V(0, 0.80, 0)),
                 cylNode(m.trim, r: 0.08, h: 2.0, axis: .z, at: V(1.15, 0.75, 0)),
@@ -148,7 +152,7 @@ enum Catalog {
             ] + cabin(m, x: -0.25, bottom: 1.52, length: 1.45, height: 0.52, width: 1.42))
         },
         BodyStyle(id: "jeep", wheelRadius: 0.5, wheelbase: 2.1, track: 1.75, wheelWidth: 0.42,
-                  roof: V(-0.75, 2.1, 0), rear: V(-1.3, 1.26, 0), seat: V(-0.12, 1.15, 0.34), driverScale: 1.0) { m in
+                  roof: V(-0.75, 2.1, 0), rear: V(-1.3, 1.26, 0), seat: V(-0.1, 1.12, 0.34), driverScale: 1.1) { m in
             group("body", [
                 boxNode(m.paint, 2.7, 0.62, 1.45, r: 0.14, at: V(0, 0.95, 0)),
                 boxNode(m.paint, 0.95, 0.2, 1.35, r: 0.08, at: V(0.85, 1.32, 0)),
@@ -185,20 +189,26 @@ enum Catalog {
             ] + cabin(m, x: 0, bottom: 1.42, length: 4.4, height: 0.52, width: 1.7, pillars: 4))
         },
         BodyStyle(id: "bubble", wheelRadius: 0.42, wheelbase: 1.9, track: 1.6, wheelWidth: 0.36,
-                  roof: V(-0.1, 1.8, 0), rear: V(-1.3, 1.15, 0), seat: V(-0.05, 1.05, 0), driverScale: 0.85) { m in
+                  roof: V(-0.05, 1.82, 0), rear: V(-1.3, 1.15, 0), seat: V(0.0, 1.0, 0), driverScale: 1.0) { m in
             group("body", [
                 sphereNode(m.paint, r: 1, at: V(0, 0.85, 0), scale: V(1.55, 0.64, 0.84)),
-                sphereNode(m.glass, r: 1, at: V(-0.1, 1.24, 0), scale: V(0.95, 0.56, 0.72)),
+                sphereNode(m.glass, r: 1, at: V(-0.05, 1.24, 0), scale: V(1.0, 0.64, 0.76)),
                 sphereNode(m.headlight, r: 0.15, at: V(1.28, 0.98, 0.45)),
                 sphereNode(m.headlight, r: 0.15, at: V(1.28, 0.98, -0.45)),
-                boxNode(m.chrome, 0.12, 0.1, 1.3, r: 0.05, at: V(1.52, 0.58, 0)),
-                boxNode(m.chrome, 0.12, 0.1, 1.3, r: 0.05, at: V(-1.52, 0.58, 0)),
+                capsuleNode(m.chrome, r: 0.08, h: 1.1, axis: .z, at: V(1.45, 0.55, 0)),
+                capsuleNode(m.chrome, r: 0.08, h: 1.1, axis: .z, at: V(-1.45, 0.55, 0)),
+                sphereNode(m.paint, r: 0.42, at: V(0.95, 0.72, 0.62), scale: V(1.3, 0.8, 0.7)),
+                sphereNode(m.paint, r: 0.42, at: V(0.95, 0.72, -0.62), scale: V(1.3, 0.8, 0.7)),
+                sphereNode(m.paint, r: 0.42, at: V(-0.95, 0.72, 0.62), scale: V(1.3, 0.8, 0.7)),
+                sphereNode(m.paint, r: 0.42, at: V(-0.95, 0.72, -0.62), scale: V(1.3, 0.8, 0.7)),
+                capsuleNode(m.chrome, r: 0.03, h: 0.2, axis: .x, at: V(0.25, 1.05, 0.83)),
+                capsuleNode(m.chrome, r: 0.03, h: 0.2, axis: .x, at: V(0.25, 1.05, -0.83)),
                 sphereNode(m.taillight, r: 0.09, at: V(-1.44, 0.92, 0.42)),
                 sphereNode(m.taillight, r: 0.09, at: V(-1.44, 0.92, -0.42)),
             ])
         },
         BodyStyle(id: "pickup", wheelRadius: 0.48, wheelbase: 2.6, track: 1.75, wheelWidth: 0.4,
-                  roof: V(0.25, 1.88, 0), rear: V(-1.8, 1.5, 0), seat: V(0.3, 0.95, 0), driverScale: 0.95) { m in
+                  roof: V(0.25, 1.88, 0), rear: V(-1.8, 1.5, 0), seat: V(0.3, 0.92, 0), driverScale: 1.0) { m in
             group("body", [
                 boxNode(m.paint, 3.9, 0.6, 1.6, r: 0.16, at: V(0, 0.9, 0)),
                 boxNode(m.trim, 1.6, 0.06, 1.42, at: V(-1.05, 1.21, 0)),
@@ -260,16 +270,23 @@ enum Catalog {
         WheelStyle(id: "star", scale: 1.05, widthScale: 1.0) { m, r, w in
             let tire = torusNode(m.rubber, ring: r * 0.7, pipe: r * 0.3, at: V(0, 0, 0))
             tire.scale = V(1, Float(w / (r * 0.6)), 1)
-            var parts = [tire,
-                         cylNode(m.white, r: r * 0.5, h: w * 0.7, at: V(0, 0, 0)),
-                         sphereNode(m.gold, r: r * 0.16, at: V(0, Float(w) * 0.42, 0))]
-            for i in 0..<5 {
-                let a = Float(i) / 5 * 2 * .pi
-                let arm = coneNode(m.gold, top: 0, bottom: r * 0.13, h: r * 0.42, at: V(cos(a) * Float(r) * 0.22, Float(w) * 0.4, sin(a) * Float(r) * 0.22))
-                arm.eulerAngles = V(0, -a, -.pi / 2)
-                parts.append(arm)
+            let star = UIBezierPath()
+            for k in 0..<10 {
+                let ang = CGFloat(k) / 10 * 2 * .pi + .pi / 2
+                let rad = (k % 2 == 0 ? 0.46 : 0.2) * r
+                let pt = CGPoint(x: cos(ang) * rad, y: sin(ang) * rad)
+                if k == 0 { star.move(to: pt) } else { star.addLine(to: pt) }
             }
-            return group(nil, parts)
+            star.close()
+            let shape = SCNShape(path: star, extrusionDepth: w * 0.2)
+            shape.chamferRadius = 0.01
+            shape.materials = [m.gold]
+            let starNode = SCNNode(geometry: shape)
+            starNode.eulerAngles.x = -.pi / 2       // face toward +Y (the hub side)
+            starNode.position = V(0, Float(w) * 0.42, 0)
+            return group(nil, [tire,
+                               cylNode(m.white, r: r * 0.52, h: w * 0.8, at: V(0, 0, 0)),
+                               starNode])
         },
         WheelStyle(id: "donut", scale: 1.05, widthScale: 1.25) { m, r, w in
             let dough = SCNMaterial.pbr(UIColor(red: 0.85, green: 0.6, blue: 0.32, alpha: 1), rough: 0.7)

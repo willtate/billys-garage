@@ -61,7 +61,7 @@ final class ThumbnailRenderer {
         let len = sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z)
         let dir = V(direction.x / len, direction.y / len, direction.z / len)
         let fov = Float(camera.camera!.fieldOfView) * .pi / 180
-        let dist = radius / sin(fov / 2) * 0.92
+        let dist = radius / sin(fov / 2) * 0.78
         camera.position = V(center.x + dir.x * dist, center.y + dir.y * dist, center.z + dir.z * dist)
         camera.look(at: center)
         let scale = UIScreen.main.scale

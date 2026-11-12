@@ -37,7 +37,7 @@ enum Scenery {
             // Keep the camera's line of sight (it looks from +Z) clear.
             if abs(a - .pi / 2) < 0.75 { continue }
             let tree = SCNNode()
-            tree.position = V(cos(a) * d, 0, sin(a) * d)
+            tree.position = V(cos(a) * d, -0.25, sin(a) * d)
             tree.scale = V(s, s, s)
             tree.addChildNode(cylNode(trunk, r: 0.16, h: 1.2, at: V(0, 0.6, 0)))
             let leaf = leaves[i % leaves.count]
@@ -54,13 +54,71 @@ enum Scenery {
         // Flowers sprinkled on the grass
         for i in 0..<40 {
             let a = rng.next(0, 2 * .pi)
-            let d = rng.next(4.5, 9)
+            let d = rng.next(7.2, 10)
             let mat = SCNMaterial.pbr(flowerColors[i % flowerColors.count], rough: 0.5)
             let f = SCNNode()
-            f.position = V(cos(a) * d, 0, sin(a) * d)
+            f.position = V(cos(a) * d, -0.25, sin(a) * d)
             f.addChildNode(cylNode(grassDark, r: 0.02, h: 0.3, at: V(0, 0.15, 0)))
             f.addChildNode(sphereNode(mat, r: 0.1, at: V(0, 0.32, 0)))
             root.addChildNode(f)
+        }
+
+        // A road ring around the garage for laps
+        let asphalt = SCNMaterial.pbr(UIColor(white: 0.32, alpha: 1), rough: 0.85)
+        let road = SCNNode(geometry: SCNTube(innerRadius: 4.9, outerRadius: 6.7, height: 0.04))
+        road.geometry?.materials = [asphalt]
+        (road.geometry as? SCNTube)?.radialSegmentCount = 96
+        road.position = V(0, -0.25, 0)
+        root.addChildNode(road)
+        let paint = SCNMaterial.pbr(.white, rough: 0.5)
+        let curbRed = SCNMaterial.pbr(UIColor(red: 0.95, green: 0.2, blue: 0.2, alpha: 1), rough: 0.6)
+        for i in 0..<36 {
+            let a = Float(i) / 36 * 2 * .pi
+            let dash = boxNode(paint, 0.12, 0.02, 0.55, at: V(cos(a) * 5.8, -0.22, sin(a) * 5.8))
+            dash.eulerAngles.y = -a
+            root.addChildNode(dash)
+        }
+        for i in 0..<72 {
+            let a = (Float(i) + 0.5) / 72 * 2 * .pi
+            let curb = boxNode(i % 2 == 0 ? curbRed : paint, 0.16, 0.08, 0.5, r: 0.03, at: V(cos(a) * 6.75, -0.21, sin(a) * 6.75))
+            curb.eulerAngles.y = -a
+            root.addChildNode(curb)
+        }
+
+        // A toy town on the horizon
+        let wallColors: [UIColor] = [
+            UIColor(red: 1.0, green: 0.85, blue: 0.55, alpha: 1), UIColor(red: 0.6, green: 0.85, blue: 1.0, alpha: 1),
+            UIColor(red: 1.0, green: 0.7, blue: 0.75, alpha: 1), UIColor(red: 0.75, green: 0.95, blue: 0.7, alpha: 1),
+            UIColor(white: 0.97, alpha: 1), UIColor(red: 0.85, green: 0.75, blue: 1.0, alpha: 1),
+        ]
+        let roofColors: [UIColor] = [.systemRed, .systemBlue, .systemOrange, UIColor(red: 0.45, green: 0.3, blue: 0.75, alpha: 1)]
+        let window = SCNMaterial.pbr(UIColor(red: 0.55, green: 0.8, blue: 1.0, alpha: 1), rough: 0.1)
+        let door = SCNMaterial.pbr(UIColor(red: 0.5, green: 0.3, blue: 0.18, alpha: 1), rough: 0.6)
+        for i in 0..<14 {
+            let a = Float(i) / 14 * 2 * .pi + rng.next(-0.08, 0.08)
+            if abs(a - .pi / 2) < 0.6 { continue }
+            let d = rng.next(15, 19)
+            let w = CGFloat(rng.next(1.6, 2.6)), h = CGFloat(rng.next(1.4, 3.2)), dep = CGFloat(1.6)
+            let wall = SCNMaterial.pbr(wallColors[i % wallColors.count], rough: 0.6)
+            let roof = SCNMaterial.pbr(roofColors[i % roofColors.count], rough: 0.5)
+            let house = SCNNode()
+            house.position = V(cos(a) * d, -0.25, sin(a) * d)
+            house.eulerAngles.y = -a - .pi / 2   // front faces the garage
+            house.addChildNode(boxNode(wall, w, h, dep, r: 0.08, at: V(0, Float(h) / 2, 0)))
+            let pyr = SCNNode(geometry: SCNPyramid(width: w + 0.3, height: 1.0, length: dep + 0.3))
+            pyr.geometry?.materials = [roof]
+            pyr.position = V(0, Float(h), 0)
+            house.addChildNode(pyr)
+            house.addChildNode(boxNode(door, 0.45, 0.8, 0.05, r: 0.05, at: V(0, 0.4, Float(dep) / 2)))
+            let rows = max(1, Int(h / 1.1))
+            for r in 0..<rows {
+                for c in [-1, 1] {
+                    let wy = 0.95 + Float(r) * 1.0
+                    if wy + 0.3 > Float(h) { continue }
+                    house.addChildNode(boxNode(window, 0.4, 0.4, 0.05, r: 0.04, at: V(Float(c) * Float(w) * 0.28, wy, Float(dep) / 2)))
+                }
+            }
+            root.addChildNode(house)
         }
 
         // Clouds drifting slowly round the sky

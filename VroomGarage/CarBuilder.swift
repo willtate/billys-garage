@@ -27,6 +27,7 @@ enum CarBuilder {
         root.name = "car"
 
         let bodyNode = body.build(m)
+        Details.decorate(body.id, bodyNode, m)
         bodyNode.position.y += lift
         root.addChildNode(bodyNode)
 

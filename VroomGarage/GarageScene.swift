@@ -17,7 +17,7 @@ final class GarageScene {
 
     private let minDistance: Float = 8
     private let maxDistance: Float = 16
-    var cameraDistance: Float = 11.5 { didSet { cameraNode.position.z = cameraDistance } }
+    var cameraDistance: Float = 10 { didSet { cameraNode.position.z = cameraDistance } }
 
     static let skyTop = UIColor(red: 0.45, green: 0.78, blue: 1.0, alpha: 1)
     static let horizon = UIColor(red: 0.86, green: 0.94, blue: 1.0, alpha: 1)
@@ -28,19 +28,21 @@ final class GarageScene {
         scene.lightingEnvironment.contents = sky
         scene.lightingEnvironment.intensity = 1.3
         scene.fogColor = Self.horizon
-        scene.fogStartDistance = 20
-        scene.fogEndDistance = 55
+        scene.fogStartDistance = 30
+        scene.fogEndDistance = 80
 
         // Ground
         let floor = SCNFloor()
         floor.reflectivity = 0.04
-        floor.materials = [.pbr(UIColor(red: 0.80, green: 0.90, blue: 0.80, alpha: 1), rough: 0.9)]
-        scene.rootNode.addChildNode(SCNNode(geometry: floor))
+        floor.materials = [.pbr(UIColor(red: 0.52, green: 0.84, blue: 0.42, alpha: 1), rough: 0.9)]
+        let floorNode = SCNNode(geometry: floor)
+        floorNode.position.y = -0.25
+        scene.rootNode.addChildNode(floorNode)
 
         // Turntable
         let deck = SCNMaterial.pbr(UIColor(white: 0.97, alpha: 1), rough: 0.4, clearCoat: true)
         let rim = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.78, blue: 0.1, alpha: 1), rough: 0.3, clearCoat: true)
-        let table = cylNode(deck, r: 3.6, h: 0.18, at: V(0, -0.09, 0))
+        let table = cylNode(deck, r: 3.6, h: 0.3, at: V(0, -0.15, 0))
         let ring = torusNode(rim, ring: 3.6, pipe: 0.12, at: V(0, -0.02, 0))
         userSpin.addChildNode(table)
         userSpin.addChildNode(ring)
@@ -53,7 +55,7 @@ final class GarageScene {
         scene.rootNode.addChildNode(autoSpin)
         autoSpin.addChildNode(userSpin)
         userSpin.addChildNode(carHolder)
-        userSpin.eulerAngles.y = 0.65
+        userSpin.eulerAngles.y = -0.6
 
         // Lights
         let sun = SCNLight()
@@ -85,7 +87,7 @@ final class GarageScene {
         cam.fieldOfView = 34
         cam.zNear = 0.1
         cam.zFar = 120
-        cam.wantsHDR = true
+        cam.wantsHDR = false
         cam.bloomIntensity = 0.35
         cam.bloomThreshold = 0.9
         cam.bloomBlurRadius = 10
@@ -94,8 +96,8 @@ final class GarageScene {
         cameraNode.camera = cam
         cameraNode.position = V(0, 0, cameraDistance)
         cameraRig.addChildNode(cameraNode)
-        cameraRig.position = V(0, 0.15, 0)
-        cameraRig.eulerAngles.x = -0.30
+        cameraRig.position = V(0, 0.55, 0)
+        cameraRig.eulerAngles.x = -0.2
         scene.rootNode.addChildNode(cameraRig)
 
         scene.rootNode.addChildNode(Scenery.make())
@@ -241,34 +243,62 @@ final class GarageScene {
         carHolder.runAction(flash, forKey: "flash")
     }
 
+    static let roadRadius: Float = 5.8
+    private let lapTime: TimeInterval = 4.2
+
     func vroom() {
         guard !isDriving, let car = car else { return }
         isDriving = true
         SoundFX.shared.play(.vroom)
-        let total: TimeInterval = 2.4
 
         // Spin every wheel. Right-side mounts are flipped, so they spin the other way.
         for s in car.spinners {
             let dir: CGFloat = s.name == "spinL" ? -1 : 1
-            let spin = SCNAction.rotateBy(x: 0, y: 0, z: dir * 40, duration: total)
+            let spin = SCNAction.rotateBy(x: 0, y: 0, z: dir * 90, duration: lapTime + 0.3)
             spin.timingMode = .easeInEaseOut
             s.runAction(spin, forKey: "spin")
         }
 
-        // Rev, zoom off the front of the turntable, come back around from behind.
+        // Rev, drive off the turntable onto the road, do a lap, come home and spin round.
         let rev = SCNAction.sequence([
             .rotateTo(x: 0, y: 0, z: 0.06, duration: 0.15),
             .rotateTo(x: 0, y: 0, z: 0, duration: 0.15),
         ])
-        let out = SCNAction.moveBy(x: 16, y: 0, z: 0, duration: 0.85); out.timingMode = .easeIn
-        let back = SCNAction.moveBy(x: 16, y: 0, z: 0, duration: 1.0); back.timingMode = .easeOut
+        let R = Self.roadRadius
+        let total = R * 2 + 2 * .pi * R
+        let lapDuration = lapTime
+        let lap = SCNAction.customAction(duration: lapDuration) { node, elapsed in
+            let u = Float(elapsed / CGFloat(lapDuration))
+            let eased = u * u * (3 - 2 * u)
+            let s = eased * total
+            var x: Float, z: Float, yaw: Float
+            if s < R {
+                x = s; z = 0
+                yaw = (.pi / 2) * smooth01((s - 0.55 * R) / (0.45 * R))
+            } else if s < R + 2 * .pi * R {
+                let th = (s - R) / R
+                x = R * cos(th); z = -R * sin(th)
+                yaw = th + .pi / 2
+            } else {
+                let d = s - R - 2 * .pi * R
+                x = R - d; z = 0
+                yaw = 2 * .pi + .pi / 2 + (.pi / 2) * smooth01(d / (0.45 * R))
+            }
+            let r = (x * x + z * z).squareRoot()
+            let y = -0.25 * smooth01((r - 3.4) / 0.5)
+            node.position = V(x, y, z)
+            node.eulerAngles = V(0, yaw, 0)
+        }
+        let spinHome = SCNAction.rotateBy(x: 0, y: .pi, z: 0, duration: 0.45)
+        spinHome.timingMode = .easeOut
         carHolder.runAction(.sequence([
             rev,
             .run { [weak self] _ in self?.exhaust() },
-            out,
-            .move(to: V(-16, 0, 0), duration: 0),
-            back,
-            .run { [weak self] _ in
+            lap,
+            spinHome,
+            .run { [weak self] node in
+                node.eulerAngles = V(0, 0, 0)
+                node.position = V(0, 0, 0)
                 DispatchQueue.main.async { self?.isDriving = false; self?.hop() }
             },
         ]), forKey: "drive")
@@ -293,6 +323,7 @@ final class GarageScene {
         ps.propertyControllers = [.size: SCNParticlePropertyController(animation: sizeAnim)]
         let n = SCNNode()
         let worldPos = carHolder.convertPosition(V(-1.9, 0.5, 0), to: scene.rootNode)
+        ps.emittingDirection = carHolder.convertVector(V(-1, 0.3, 0), to: scene.rootNode)
         n.position = worldPos
         n.addParticleSystem(ps)
         scene.rootNode.addChildNode(n)
@@ -302,7 +333,13 @@ final class GarageScene {
     // MARK: Turntable control
 
     private func startAutoSpin() {
-        autoSpin.runAction(.repeatForever(.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 26)), forKey: "auto")
+        // Gently sway around a three-quarter front view so the driver and headlights face the kid.
+        let left = SCNAction.rotateTo(x: 0, y: 0.45, z: 0, duration: 4.5, usesShortestUnitArc: true)
+        let right = SCNAction.rotateTo(x: 0, y: -0.45, z: 0, duration: 4.5, usesShortestUnitArc: true)
+        left.timingMode = .easeInEaseOut
+        right.timingMode = .easeInEaseOut
+        let sway = SCNAction.sequence([left, right])
+        autoSpin.runAction(.repeatForever(sway), forKey: "auto")
     }
 
     func beginTouch() {
@@ -331,4 +368,9 @@ final class GarageScene {
     func zoom(to distance: Float) {
         cameraDistance = min(max(distance, minDistance), maxDistance)
     }
+}
+
+@inline(__always) func smooth01(_ x: Float) -> Float {
+    let t = min(max(x, 0), 1)
+    return t * t * (3 - 2 * t)
 }

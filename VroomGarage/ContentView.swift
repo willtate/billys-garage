@@ -185,14 +185,14 @@ struct PartCard: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .padding(8)
+                        .padding(2)
                 } else {
                     Image(systemName: placeholder)
                         .font(.system(size: 52, weight: .bold))
                         .foregroundColor(tint.opacity(0.7))
                 }
             }
-            .frame(width: 148, height: 148)
+            .frame(width: 172, height: 150)
             .overlay(
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .stroke(selected ? tint : Color.clear, lineWidth: 7)
