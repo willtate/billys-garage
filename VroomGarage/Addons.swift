@@ -23,7 +23,9 @@ extension Catalog {
             p.append(boxNode(m.trim, 0.4, 0.2, 0.34, r: 0.04, at: V(0.0, 0.48, 0)))
             p.append(boxNode(m.grille, 0.04, 0.16, 0.3, at: V(0.2, 0.48, 0)))
             for i in 0..<3 { p.append(boxNode(m.chrome, 0.03, 0.02, 0.28, at: V(0.21, 0.42 + Float(i) * 0.06, 0))) }
-            return group("addon", p)
+            let inner = group(nil, p)
+            inner.scale = V(0.8, 0.8, 0.8)   // in an inner node so the pop-in animation keeps it
+            return group("addon", [inner])
         },
         AddonStyle(id: "scoop") { m, _ in
             let path = UIBezierPath()

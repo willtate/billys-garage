@@ -149,8 +149,8 @@ let contactShadowImage: UIImage = {
         for x in 0..<w {
             let u = abs(Float(x) / Float(w - 1) * 2 - 1), v = abs(Float(y) / Float(h - 1) * 2 - 1)
             let d = pow(pow(u, 4) + pow(v, 4), 0.25)
-            let t = max(0, min(1, (d - 0.45) / 0.55))
-            let a = 0.62 * (1 - t * t * (3 - 2 * t))
+            let t = max(0, min(1, (d - 0.35) / 0.65))
+            let a = 0.88 * (1 - t * t * (3 - 2 * t))
             px[(y * w + x) * 4 + 3] = UInt8(a * 255)
         }
     }

@@ -171,8 +171,8 @@ final class CarMaterials {
         SCNTransaction.begin()
         SCNTransaction.animationDuration = animated ? 0.45 : 0
         paint.diffuse.contents = p.color
-        paint.metalness.contents = p.metallic ? 0.9 : 0.3
-        paint.roughness.contents = p.metallic ? 0.25 : 0.35
+        paint.metalness.contents = p.metallic ? 0.85 : 0.2
+        paint.roughness.contents = p.metallic ? 0.2 : 0.14
         stripe.diffuse.contents = p.isLight ? UIColor(white: 0.1, alpha: 1) : UIColor(white: 0.98, alpha: 1)
         SCNTransaction.commit()
     }

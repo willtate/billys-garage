@@ -119,8 +119,74 @@ final class GarageScene {
         scene.rootNode.addChildNode(cameraRig)
 
         scene.rootNode.addChildNode(Workshop.make())
+        captureGarageReflections()
         startAutoSpin()
     }
+
+    /// Photograph the workshop in six directions from where the car sits and use that as the
+    /// environment, so paint, chrome and glass reflect the real garage instead of a generic studio.
+    private func captureGarageReflections() {
+        let size: CGFloat = 256
+        let r = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
+        r.scene = scene
+        let cam = SCNCamera()
+        cam.fieldOfView = 90
+        cam.zNear = 0.05
+        cam.zFar = 120
+        let eye = SCNNode()
+        eye.camera = cam
+        eye.position = V(0, 1.0, 0)
+        scene.rootNode.addChildNode(eye)
+        r.pointOfView = eye
+        carHolder.isHidden = true
+        func shot(_ dir: SCNVector3, up: SCNVector3) -> UIImage {
+            eye.look(at: V(dir.x, 1.0 + dir.y, dir.z), up: up, localFront: V(0, 0, -1))
+            return r.snapshot(atTime: 0, with: CGSize(width: size, height: size), antialiasingMode: .none)
+        }
+        let px = shot(V(1, 0, 0), up: V(0, 1, 0))
+        let nx = shot(V(-1, 0, 0), up: V(0, 1, 0))
+        let ny = shot(V(0, -1, 0), up: V(0, 0, 1))
+        let pz = shot(V(0, 0, 1), up: V(0, 1, 0))
+        let nz = shot(V(0, 0, -1), up: V(0, 1, 0))
+        carHolder.isHidden = false
+        eye.removeFromParentNode()
+        // Showroom contrast: a row of shop lights just above the horizon and a darker floor,
+        // so the flanks carry the bright reflected horizon line real paint shows.
+        func stage(_ img: UIImage, floor: Bool = false) -> UIImage {
+            let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
+            return UIGraphicsImageRenderer(size: CGSize(width: size, height: size), format: fmt).image { ctx in
+                let c = ctx.cgContext, w = size, h = size
+                img.draw(in: CGRect(x: 0, y: 0, width: w, height: h))
+                if floor { return }
+                c.setFillColor(UIColor(white: 0, alpha: 0.45).cgColor)
+                c.fill(CGRect(x: 0, y: h * 0.52, width: w, height: h * 0.48))
+                c.setFillColor(UIColor.white.cgColor)
+                c.fill(CGRect(x: 0, y: h * 0.38, width: w, height: h * 0.05))
+                c.setFillColor(UIColor(white: 1, alpha: 0.5).cgColor)
+                c.fill(CGRect(x: 0, y: h * 0.2, width: w, height: h * 0.025))
+            }
+        }
+        let cube: [UIImage] = [stage(px), stage(nx), Self.workshopCeiling, stage(ny, floor: true), stage(pz), stage(nz)]
+        scene.lightingEnvironment.contents = cube
+        scene.lightingEnvironment.intensity = 0.85
+        for mat in [materials.glass, materials.lens, materials.tailLens] { mat.reflective.contents = cube }
+        materials.glass.reflective.intensity = 0.55
+    }
+
+    /// Dark ceiling with long fluorescent panels: gives the hood and roof crisp highlight streaks.
+    static let workshopCeiling: UIImage = {
+        let s: CGFloat = 256
+        let fmt = UIGraphicsImageRendererFormat(); fmt.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: s, height: s), format: fmt).image { ctx in
+            let c = ctx.cgContext
+            c.setFillColor(UIColor(white: 0.14, alpha: 1).cgColor)
+            c.fill(CGRect(x: 0, y: 0, width: s, height: s))
+            c.setFillColor(UIColor(white: 1, alpha: 1).cgColor)
+            for x: CGFloat in [52, 120, 188] {
+                c.fill(CGRect(x: x, y: 20, width: 16, height: s - 40))
+            }
+        }
+    }()
 
     // MARK: Building
 
