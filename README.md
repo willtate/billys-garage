@@ -7,7 +7,7 @@ Everything — cars, wheels, textures and sounds — is generated in code. There
 ## Web (main version)
 
 `web/` is the Three.js version, playable at [billys-garage.frogdog.io](https://billys-garage.frogdog.io). Add it to the iPad home screen from Safari; it works offline and updates itself.
-Every push to `main` is built and deployed by Netlify (base directory `web`).
+Every push to `main` is built and deployed by Netlify (see `netlify.toml`).
 
 ```bash
 cd web
