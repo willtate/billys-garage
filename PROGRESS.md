@@ -45,6 +45,11 @@
   - A new wire-spoke wheel.
 - **Round 4 verdict: ours won blind again**, with a fresh judge and three Labo screenshots no judge had seen.
 
+- **Hand test in the simulator (live taps):** body, wheel, and paint picks, tab switching, tray scrolling, GO, honk, drag-to-spin, and pinch-to-zoom all work.
+  - Fixed: during GO, the car vanished behind the parts tray on the near half of the lap. The camera now rises to a bird's-eye view for the lap, then glides back.
+  - Fixed: pinch is ignored while the car is driving.
+  - Changed: a fresh start is now a blue racer (was red).
+
 ## Known gaps worth another loop
-- Not yet judged: motion and sound. The judge only sees still screenshots.
-- Not yet hand-tested in the simulator: tapping, dragging, pinching, honk on tap.
+- Not yet judged: sound. Audio can't be heard from the simulator here; it needs a listen on a real iPad.
+- No app icon yet (blank placeholder on the home screen).

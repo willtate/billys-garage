@@ -6,7 +6,7 @@ import UIKit
 struct CarDesign: Codable, Equatable {
     var body = "racer"
     var wheels = "classic"
-    var paint = "red"
+    var paint = "blue"
     var topper = "none"
 }
 

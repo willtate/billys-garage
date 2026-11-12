@@ -302,6 +302,22 @@ final class GarageScene {
             node.position = V(x, y, z)
             node.eulerAngles = V(0, yaw, 0)
         }
+        // Lift the camera so the whole lap stays above the parts tray, then glide back.
+        let restDistance = cameraDistance
+        let lift = SCNAction.customAction(duration: lapDuration + 0.3) { [weak self] _, elapsed in
+            guard let self = self else { return }
+            let u = Float(elapsed) / Float(lapDuration + 0.3)
+            let k = smooth01(u / 0.15) * (1 - smooth01((u - 0.85) / 0.15))
+            self.cameraRig.eulerAngles.x = -0.2 + (-0.42 * k)
+            self.cameraRig.position = V(0, 0.55, 3.0 * k)
+            self.cameraNode.position.z = restDistance + (19 - restDistance) * k
+        }
+        cameraRig.runAction(.sequence([.wait(duration: 0.3), lift, .run { [weak self] rig in
+            rig.eulerAngles.x = -0.2
+            rig.position = V(0, 0.55, 0)
+            self?.cameraNode.position.z = restDistance
+        }]), forKey: "lift")
+
         let spinHome = SCNAction.rotateBy(x: 0, y: .pi, z: 0, duration: 0.45)
         spinHome.timingMode = .easeOut
         carHolder.runAction(.sequence([
@@ -379,6 +395,7 @@ final class GarageScene {
     }
 
     func zoom(to distance: Float) {
+        guard !isDriving else { return }
         cameraDistance = min(max(distance, minDistance), maxDistance)
     }
 }
