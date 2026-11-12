@@ -65,6 +65,12 @@ enum CarBuilder {
                 orient(shape, .z)
                 spinner.addChildNode(shape)
                 mount.addChildNode(spinner)
+                // Brake caliper: fixed to the hub, so it doesn't spin with the wheel.
+                if wheel.id != "offroad" {
+                    let caliper = boxNode(m.caliper, CGFloat(radius) * 0.32, CGFloat(radius) * 0.16, CGFloat(width) * 0.16,
+                                          r: CGFloat(radius) * 0.05, at: V(0, radius * 0.4, width * 0.12))
+                    mount.addChildNode(caliper)
+                }
                 root.addChildNode(mount)
                 mounts.append(mount)
                 spinners.append(spinner)

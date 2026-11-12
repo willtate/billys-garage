@@ -104,11 +104,12 @@ final class CarMaterials {
     let alloy = SCNMaterial.pbr(UIColor(white: 0.78, alpha: 1), metal: 1.0, rough: 0.28)
     let gunmetal = SCNMaterial.pbr(UIColor(white: 0.22, alpha: 1), metal: 1.0, rough: 0.35)
     let rubber: SCNMaterial = {
-        let m = SCNMaterial.pbr(UIColor(white: 0.09, alpha: 1), rough: 0.85)
+        let m = SCNMaterial.pbr(UIColor(white: 0.075, alpha: 1), rough: 0.97)
+        m.specular.contents = UIColor(white: 0.1, alpha: 1)
         return m
     }()
     let tread: SCNMaterial = {
-        let m = SCNMaterial.pbr(.white, rough: 0.9)
+        let m = SCNMaterial.pbr(.white, rough: 0.97)
         m.diffuse.contents = treadImage
         m.diffuse.wrapS = .repeat
         m.diffuse.wrapT = .repeat
@@ -125,6 +126,7 @@ final class CarMaterials {
     let amber = SCNMaterial.pbr(UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 1), rough: 0.15,
                                  emission: UIColor(red: 0.8, green: 0.35, blue: 0.0, alpha: 1))
 
+    let caliper = SCNMaterial.pbr(UIColor(red: 0.85, green: 0.08, blue: 0.06, alpha: 1), rough: 0.3, clearCoat: true)
     /// Polished lamp reflector: bright silver with a faint glow so lamps read as lit.
     let reflector = SCNMaterial.pbr(UIColor(white: 0.92, alpha: 1), metal: 1.0, rough: 0.3,
                                     emission: UIColor(white: 0.32, alpha: 1))

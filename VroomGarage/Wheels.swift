@@ -37,8 +37,12 @@ enum WheelKit {
     static func barrel(_ m: CarMaterials, rim: CGFloat, w: CGFloat, lip: SCNMaterial, back: SCNMaterial? = nil) -> [SCNNode] {
         let tube = SCNNode(geometry: SCNTube(innerRadius: rim * 0.9, outerRadius: rim, height: w * 0.84))
         tube.geometry?.materials = [m.gunmetal]
+        // Brake disc with a darker hat, seen through the spokes.
+        let disc = SCNMaterial.pbr(UIColor(white: 0.45, alpha: 1), metal: 0.9, rough: 0.45)
         return [tube,
-                cylNode(back ?? m.grille, r: rim * 0.9, h: 0.02, at: V(0, Float(w) * 0.02, 0)),
+                cylNode(back ?? m.grille, r: rim * 0.9, h: 0.02, at: V(0, -Float(w) * 0.1, 0)),
+                cylNode(disc, r: rim * 0.74, h: w * 0.05, at: V(0, Float(w) * 0.08, 0)),
+                cylNode(m.gunmetal, r: rim * 0.32, h: w * 0.07, at: V(0, Float(w) * 0.1, 0)),
                 torusNode(lip, ring: rim * 0.95, pipe: rim * 0.06, at: V(0, Float(w) * 0.4, 0))]
     }
 
@@ -75,10 +79,10 @@ enum WheelKit {
 extension Catalog {
     static let wheels: [WheelStyle] = [
         WheelStyle(id: "alloy", scale: 1.0, widthScale: 1.0) { m, r, w in
-            let rim = r * 0.64
+            let rim = r * 0.7
             return group(nil, WheelKit.tyre(m, r: r, w: w, rim: rim)
                 + WheelKit.barrel(m, rim: rim, w: w, lip: m.alloy)
-                + WheelKit.spokes(m.alloy, count: 5, from: rim * 0.2, to: rim * 0.95, y: w * 0.34, width: rim * 0.09, depth: w * 0.1, twin: true)
+                + WheelKit.spokes(m.alloy, count: 5, from: rim * 0.2, to: rim * 0.95, y: w * 0.34, width: rim * 0.07, depth: w * 0.14, twin: true)
                 + WheelKit.hub(m, rim: rim, w: w, cap: m.alloy))
         },
         WheelStyle(id: "chrome", scale: 1.0, widthScale: 1.05) { m, r, w in
