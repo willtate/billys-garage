@@ -83,6 +83,10 @@ struct BodyStyle: Identifiable {
     /// Where the driver sits (bottom of the torso) and how big they are.
     let seat: SCNVector3
     let driverScale: Float
+    /// Front-of-car spot for things like googly eyes.
+    var hood = V(1, 1, 0)
+    /// Side panel distance from the centre line, for fender arches. 0 = no arches.
+    var sideZ: Float = 0
     let build: (CarMaterials) -> SCNNode
 }
 
@@ -94,7 +98,7 @@ struct WheelStyle: Identifiable {
     let build: (CarMaterials, CGFloat, CGFloat) -> SCNNode
 }
 
-enum TopperSpot { case roof, rear }
+enum TopperSpot { case roof, rear, hood }
 
 struct TopperStyle: Identifiable {
     let id: String
@@ -113,13 +117,13 @@ enum Catalog {
 
     static let bodies: [BodyStyle] = [
         BodyStyle(id: "racer", wheelRadius: 0.42, wheelbase: 2.4, track: 1.75, wheelWidth: 0.36,
-                  roof: V(-0.15, 1.15, 0), rear: V(-1.55, 0.70, 0), seat: V(-0.15, 0.3, 0), driverScale: 0.95) { m in
+                  roof: V(-0.15, 1.15, 0), rear: V(-1.55, 0.70, 0), seat: V(-0.15, 0.25, 0), driverScale: 1.0, hood: V(1.15, 0.72, 0), sideZ: 0.66) { m in
             group("body", [
                 boxNode(m.paint, 3.5, 0.40, 1.30, r: 0.18, at: V(0, 0.50, 0)),
                 boxNode(m.paint, 1.55, 0.30, 1.72, r: 0.14, at: V(-0.12, 0.46, 0)),
-                boxNode(m.trim, 0.5, 0.06, 1.95, r: 0.03, at: V(1.85, 0.30, 0)),
-                boxNode(m.trim, 0.08, 0.16, 0.06, at: V(1.85, 0.36, 0.5)),
-                boxNode(m.trim, 0.08, 0.16, 0.06, at: V(1.85, 0.36, -0.5)),
+                airfoil(m.paint, chord: 0.55, thickness: 0.09, span: 1.85, at: V(1.88, 0.3, 0)),
+                boxNode(m.white, 0.4, 0.14, 0.05, r: 0.02, at: V(1.88, 0.33, 0.94)),
+                boxNode(m.white, 0.4, 0.14, 0.05, r: 0.02, at: V(1.88, 0.33, -0.94)),
                 sphereNode(m.glass, r: 0.5, at: V(-0.15, 0.7, 0), scale: V(1.6, 0.95, 1.1)),
                 sphereNode(m.headlight, r: 0.1, at: V(1.70, 0.56, 0.42)),
                 sphereNode(m.headlight, r: 0.1, at: V(1.70, 0.56, -0.42)),
@@ -132,7 +136,7 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "monster", wheelRadius: 0.75, wheelbase: 2.3, track: 2.0, wheelWidth: 0.55,
-                  roof: V(-0.25, 2.16, 0), rear: V(-1.45, 1.53, 0), seat: V(-0.15, 1.22, 0), driverScale: 0.95) { m in
+                  roof: V(-0.25, 2.16, 0), rear: V(-1.45, 1.53, 0), seat: V(-0.1, 1.18, 0), driverScale: 1.0, hood: V(1.05, 1.53, 0), sideZ: 0.765) { m in
             group("body", [
                 boxNode(m.trim, 2.8, 0.22, 1.0, r: 0.05, at: V(0, 0.80, 0)),
                 cylNode(m.trim, r: 0.08, h: 2.0, axis: .z, at: V(1.15, 0.75, 0)),
@@ -152,7 +156,7 @@ enum Catalog {
             ] + cabin(m, x: -0.25, bottom: 1.52, length: 1.45, height: 0.52, width: 1.42))
         },
         BodyStyle(id: "jeep", wheelRadius: 0.5, wheelbase: 2.1, track: 1.75, wheelWidth: 0.42,
-                  roof: V(-0.75, 2.1, 0), rear: V(-1.3, 1.26, 0), seat: V(-0.1, 1.12, 0.34), driverScale: 1.1) { m in
+                  roof: V(-0.75, 2.1, 0), rear: V(-1.3, 1.26, 0), seat: V(-0.1, 1.12, 0.34), driverScale: 1.1, hood: V(0.85, 1.43, 0), sideZ: 0.735) { m in
             group("body", [
                 boxNode(m.paint, 2.7, 0.62, 1.45, r: 0.14, at: V(0, 0.95, 0)),
                 boxNode(m.paint, 0.95, 0.2, 1.35, r: 0.08, at: V(0.85, 1.32, 0)),
@@ -175,7 +179,7 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "bus", wheelRadius: 0.46, wheelbase: 3.0, track: 1.65, wheelWidth: 0.38,
-                  roof: V(0.3, 2.06, 0), rear: V(-1.85, 2.06, 0), seat: V(1.55, 1.0, 0.4), driverScale: 1.0) { m in
+                  roof: V(0.3, 2.06, 0), rear: V(-1.85, 2.06, 0), seat: V(1.55, 1.0, 0.4), driverScale: 1.0, hood: V(2.05, 1.42, 0), sideZ: 0.86) { m in
             group("body", [
                 boxNode(m.paint, 4.4, 0.85, 1.7, r: 0.2, at: V(0, 1.0, 0)),
                 boxNode(m.white, 4.42, 0.12, 1.72, r: 0.04, at: V(0, 1.12, 0)),
@@ -189,7 +193,7 @@ enum Catalog {
             ] + cabin(m, x: 0, bottom: 1.42, length: 4.4, height: 0.52, width: 1.7, pillars: 4))
         },
         BodyStyle(id: "bubble", wheelRadius: 0.42, wheelbase: 1.9, track: 1.6, wheelWidth: 0.36,
-                  roof: V(-0.05, 1.82, 0), rear: V(-1.3, 1.15, 0), seat: V(0.0, 1.0, 0), driverScale: 1.0) { m in
+                  roof: V(-0.05, 1.82, 0), rear: V(-1.3, 1.15, 0), seat: V(0.0, 0.95, 0), driverScale: 1.05, hood: V(0.9, 1.3, 0), sideZ: 0) { m in
             group("body", [
                 sphereNode(m.paint, r: 1, at: V(0, 0.85, 0), scale: V(1.55, 0.64, 0.84)),
                 sphereNode(m.glass, r: 1, at: V(-0.05, 1.24, 0), scale: V(1.0, 0.64, 0.76)),
@@ -208,7 +212,7 @@ enum Catalog {
             ])
         },
         BodyStyle(id: "pickup", wheelRadius: 0.48, wheelbase: 2.6, track: 1.75, wheelWidth: 0.4,
-                  roof: V(0.25, 1.88, 0), rear: V(-1.8, 1.5, 0), seat: V(0.3, 0.92, 0), driverScale: 1.0) { m in
+                  roof: V(0.25, 1.88, 0), rear: V(-1.8, 1.5, 0), seat: V(0.3, 0.88, 0), driverScale: 1.05, hood: V(1.35, 1.2, 0), sideZ: 0.81) { m in
             group("body", [
                 boxNode(m.paint, 3.9, 0.6, 1.6, r: 0.16, at: V(0, 0.9, 0)),
                 boxNode(m.trim, 1.6, 0.06, 1.42, at: V(-1.05, 1.21, 0)),
@@ -278,6 +282,7 @@ enum Catalog {
                 if k == 0 { star.move(to: pt) } else { star.addLine(to: pt) }
             }
             star.close()
+            star.flatness = 0.004
             let shape = SCNShape(path: star, extrusionDepth: w * 0.2)
             shape.chamferRadius = 0.01
             shape.materials = [m.gold]
@@ -333,9 +338,9 @@ enum Catalog {
             group("topper", [
                 boxNode(m.trim, 0.1, 0.34, 0.08, r: 0.03, at: V(0, 0.15, 0.45)),
                 boxNode(m.trim, 0.1, 0.34, 0.08, r: 0.03, at: V(0, 0.15, -0.45)),
-                boxNode(m.paint, 0.55, 0.07, 1.6, r: 0.03, at: V(-0.05, 0.34, 0)),
-                boxNode(m.trim, 0.6, 0.28, 0.05, r: 0.02, at: V(-0.05, 0.36, 0.8)),
-                boxNode(m.trim, 0.6, 0.28, 0.05, r: 0.02, at: V(-0.05, 0.36, -0.8)),
+                airfoil(m.paint, chord: 0.6, thickness: 0.11, span: 1.6, at: V(-0.05, 0.36, 0)),
+                boxNode(m.white, 0.62, 0.26, 0.06, r: 0.03, at: V(-0.05, 0.37, 0.8)),
+                boxNode(m.white, 0.62, 0.26, 0.06, r: 0.03, at: V(-0.05, 0.37, -0.8)),
             ])
         },
         TopperStyle(id: "siren", spot: .roof) { m in
@@ -377,6 +382,7 @@ enum Catalog {
             path.addLine(to: CGPoint(x: -0.4, y: 0))
             path.addQuadCurve(to: CGPoint(x: -0.45, y: 0.75), controlPoint: CGPoint(x: -0.15, y: 0.3))
             path.addQuadCurve(to: CGPoint(x: 0.45, y: 0), controlPoint: CGPoint(x: 0.0, y: 0.45))
+            path.flatness = 0.004
             let shape = SCNShape(path: path, extrusionDepth: 0.12)
             shape.chamferRadius = 0.04
             shape.materials = [m.paint]
@@ -397,10 +403,10 @@ enum Catalog {
             parts.append(sphereNode(gem, r: 0.08, at: V(0.42, 0.13, 0)))
             return group("topper", parts)
         },
-        TopperStyle(id: "eyes", spot: .roof) { m in
+        TopperStyle(id: "eyes", spot: .hood) { m in
             var parts: [SCNNode] = []
             for side: Float in [1, -1] {
-                let eye = sphereNode(m.white, r: 0.24, at: V(0.05, 0.2, side * 0.26))
+                let eye = sphereNode(m.white, r: 0.26, at: V(0.0, 0.16, side * 0.3), scale: V(0.8, 1, 1))
                 let pupilPivot = SCNNode()
                 pupilPivot.position = eye.position
                 let pupil = sphereNode(m.rubber, r: 0.11, at: V(0.17, 0.02, 0))
@@ -436,6 +442,22 @@ enum Catalog {
         PaintStyle(id: "gold", color: UIColor(red: 1.0, green: 0.75, blue: 0.25, alpha: 1), metallic: true),
         PaintStyle(id: "silver", color: UIColor(white: 0.85, alpha: 1), metallic: true),
     ]
+
+    /// A wing with a rounded, teardrop profile (front toward +X), spanning Z.
+    static func airfoil(_ mat: SCNMaterial, chord: CGFloat, thickness: CGFloat, span: CGFloat, at p: SCNVector3) -> SCNNode {
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: chord / 2, y: 0))
+        path.addQuadCurve(to: CGPoint(x: -chord / 2, y: thickness * 0.15), controlPoint: CGPoint(x: chord * 0.2, y: thickness * 1.2))
+        path.addQuadCurve(to: CGPoint(x: chord / 2, y: 0), controlPoint: CGPoint(x: 0, y: -thickness * 0.4))
+        path.close()
+        path.flatness = 0.004
+        let shape = SCNShape(path: path, extrusionDepth: span)
+        shape.chamferRadius = 0.015
+        shape.materials = [mat]
+        let n = SCNNode(geometry: shape)
+        n.position = p
+        return n
+    }
 
     /// A see-through cab: corner pillars, a roof, and a glass box so the driver shows.
     static func cabin(_ m: CarMaterials, x: Float, bottom: Float, length: CGFloat, height: CGFloat, width: CGFloat, pillars: Int = 2) -> [SCNNode] {

@@ -39,11 +39,30 @@ enum Scenery {
             let tree = SCNNode()
             tree.position = V(cos(a) * d, -0.25, sin(a) * d)
             tree.scale = V(s, s, s)
-            tree.addChildNode(cylNode(trunk, r: 0.16, h: 1.2, at: V(0, 0.6, 0)))
             let leaf = leaves[i % leaves.count]
-            tree.addChildNode(sphereNode(leaf, r: 0.8, at: V(0, 1.6, 0)))
-            tree.addChildNode(sphereNode(leaf, r: 0.55, at: V(0.45, 1.3, 0.2)))
-            tree.addChildNode(sphereNode(leaf, r: 0.5, at: V(-0.4, 1.35, -0.2)))
+            switch i % 4 {
+            case 0: // round
+                tree.addChildNode(cylNode(trunk, r: 0.16, h: 1.2, at: V(0, 0.6, 0)))
+                tree.addChildNode(sphereNode(leaf, r: 0.8, at: V(0, 1.6, 0)))
+                tree.addChildNode(sphereNode(leaf, r: 0.55, at: V(0.45, 1.3, 0.2)))
+                tree.addChildNode(sphereNode(leaf, r: 0.5, at: V(-0.4, 1.35, -0.2)))
+            case 1: // pine
+                tree.addChildNode(cylNode(trunk, r: 0.13, h: 0.7, at: V(0, 0.35, 0)))
+                tree.addChildNode(coneNode(leaves[2], top: 0, bottom: 0.85, h: 1.1, at: V(0, 1.1, 0)))
+                tree.addChildNode(coneNode(leaves[2], top: 0, bottom: 0.65, h: 0.95, at: V(0, 1.65, 0)))
+                tree.addChildNode(coneNode(leaves[2], top: 0, bottom: 0.45, h: 0.8, at: V(0, 2.15, 0)))
+            case 2: // bush with berries
+                let berry = SCNMaterial.pbr(.systemRed, rough: 0.3)
+                tree.addChildNode(sphereNode(leaf, r: 0.6, at: V(0, 0.4, 0), scale: V(1.3, 0.8, 1.1)))
+                tree.addChildNode(sphereNode(leaf, r: 0.45, at: V(0.6, 0.3, 0.1)))
+                for b in 0..<6 {
+                    let ba = Float(b) * 1.05
+                    tree.addChildNode(sphereNode(berry, r: 0.07, at: V(cos(ba) * 0.6, 0.55 + Float(b % 2) * 0.12, sin(ba) * 0.55)))
+                }
+            default: // tall poplar
+                tree.addChildNode(cylNode(trunk, r: 0.12, h: 0.8, at: V(0, 0.4, 0)))
+                tree.addChildNode(capsuleNode(leaves[1], r: 0.5, h: 2.4, at: V(0, 1.9, 0)))
+            }
             tree.runAction(.repeatForever(.sequence([
                 .rotateTo(x: 0, y: 0, z: 0.03, duration: 1.8 + Double(i % 3) * 0.3),
                 .rotateTo(x: 0, y: 0, z: -0.03, duration: 1.8 + Double(i % 3) * 0.3),
@@ -59,7 +78,11 @@ enum Scenery {
             let f = SCNNode()
             f.position = V(cos(a) * d, -0.25, sin(a) * d)
             f.addChildNode(cylNode(grassDark, r: 0.02, h: 0.3, at: V(0, 0.15, 0)))
-            f.addChildNode(sphereNode(mat, r: 0.1, at: V(0, 0.32, 0)))
+            f.addChildNode(sphereNode(SCNMaterial.pbr(.systemYellow, rough: 0.5), r: 0.06, at: V(0, 0.33, 0)))
+            for k in 0..<5 {
+                let pa = Float(k) / 5 * 2 * .pi
+                f.addChildNode(sphereNode(mat, r: 0.06, at: V(cos(pa) * 0.09, 0.32, sin(pa) * 0.09), scale: V(1, 0.5, 1)))
+            }
             root.addChildNode(f)
         }
 
@@ -110,6 +133,19 @@ enum Scenery {
             pyr.position = V(0, Float(h), 0)
             house.addChildNode(pyr)
             house.addChildNode(boxNode(door, 0.45, 0.8, 0.05, r: 0.05, at: V(0, 0.4, Float(dep) / 2)))
+            if i % 3 == 0 {
+                house.addChildNode(boxNode(SCNMaterial.pbr(UIColor(red: 0.7, green: 0.35, blue: 0.3, alpha: 1), rough: 0.7),
+                                           0.3, 0.8, 0.3, at: V(Float(w) * 0.25, Float(h) + 0.5, 0)))
+            }
+            if i % 3 == 1 {
+                // striped shop awning over the door
+                let stripe = SCNMaterial.pbr(roofColors[(i + 1) % roofColors.count], rough: 0.5)
+                for k in 0..<4 {
+                    house.addChildNode(boxNode(k % 2 == 0 ? stripe : SCNMaterial.pbr(.white, rough: 0.5),
+                                               Float(w) > 0 ? w / 4 : 0.4, 0.06, 0.5,
+                                               at: V(-Float(w) * 0.375 + Float(k) * Float(w) * 0.25, 1.05, Float(dep) / 2 + 0.2)))
+                }
+            }
             let rows = max(1, Int(h / 1.1))
             for r in 0..<rows {
                 for c in [-1, 1] {

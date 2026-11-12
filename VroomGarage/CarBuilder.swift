@@ -1,4 +1,5 @@
 import SceneKit
+import UIKit
 
 /// A car assembled from parts, with handles on the pieces we animate.
 struct BuiltCar {
@@ -54,6 +55,21 @@ enum CarBuilder {
                 mount.addChildNode(spinner)
                 root.addChildNode(mount)
                 mounts.append(mount)
+
+                // Fender arch hugging the top of the wheel
+                if body.sideZ > 0 && wheel.scale <= 1.1 {
+                    let outer = CGFloat(radius) + 0.15, inner = CGFloat(radius) + 0.04
+                    let arc = UIBezierPath(arcCenter: .zero, radius: outer, startAngle: 0, endAngle: .pi, clockwise: true)
+                    arc.addArc(withCenter: .zero, radius: inner, startAngle: .pi, endAngle: 0, clockwise: false)
+                    arc.close()
+                    arc.flatness = 0.004
+                    let shape = SCNShape(path: arc, extrusionDepth: 0.12)
+                    shape.chamferRadius = 0.03
+                    shape.materials = [m.paint]
+                    let arch = SCNNode(geometry: shape)
+                    arch.position = V(x, radius, side * (body.sideZ + 0.03))
+                    root.addChildNode(arch)
+                }
                 spinners.append(spinner)
             }
         }
@@ -61,7 +77,12 @@ enum CarBuilder {
         var topperNode: SCNNode?
         if let make = topper.build {
             let t = make(m)
-            let anchor = topper.spot == .roof ? body.roof : body.rear
+            let anchor: SCNVector3
+            switch topper.spot {
+            case .roof: anchor = body.roof
+            case .rear: anchor = body.rear
+            case .hood: anchor = body.hood
+            }
             t.position = V(anchor.x, anchor.y + lift, anchor.z)
             root.addChildNode(t)
             topperNode = t

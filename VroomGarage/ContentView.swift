@@ -67,7 +67,7 @@ struct PartTray: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 36, style: .continuous)
-                    .fill(Color.white.opacity(0.82))
+                    .fill(Color.white.opacity(0.96))
                     .shadow(color: .black.opacity(0.12), radius: 14, y: 6)
             )
             .padding(.horizontal, 18)
@@ -180,7 +180,7 @@ struct PartCard: View {
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(tint.opacity(selected ? 0.32 : 0.14))
+                    .fill(tint.opacity(selected ? 0.38 : 0.2))
                 if let image = image {
                     Image(uiImage: image)
                         .resizable()

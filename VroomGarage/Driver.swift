@@ -34,30 +34,32 @@ enum Driver {
 
         let head = SCNNode()
         head.name = "head"
-        head.position = V(0, 0.62, 0)
+        head.position = V(0, 0.64, 0)
+        head.scale = V(1.22, 1.22, 1.22)   // big friendly bobble-head
         root.addChildNode(head)
 
         head.addChildNode(sphereNode(skin, r: 0.2, at: V(0, 0, 0)))
         // Helmet in the car's paint colour, with a white stripe and a visor brim.
         let helmet = sphereNode(m.paint, r: 0.215, at: V(-0.02, 0.05, 0), scale: V(1, 0.82, 1))
         head.addChildNode(helmet)
-        head.addChildNode(boxNode(m.white, 0.42, 0.05, 0.08, r: 0.02, at: V(-0.02, 0.2, 0)))
-        head.addChildNode(cylNode(visor, r: 0.17, h: 0.025, at: V(0.12, 0.08, 0)))
+        head.addChildNode(boxNode(m.white, 0.36, 0.05, 0.08, r: 0.02, at: V(-0.05, 0.235, 0)))
         // Face: covers the front of the head below the helmet
         head.addChildNode(sphereNode(skin, r: 0.19, at: V(0.025, -0.02, 0)))
 
         for side: Float in [1, -1] {
-            let eye = sphereNode(dark, r: 0.036, at: V(0.18, 0.0, side * 0.075), scale: V(0.6, 1.15, 1))
+            let eye = sphereNode(dark, r: 0.045, at: V(0.175, 0.01, side * 0.08), scale: V(0.6, 1.2, 1))
             eye.name = "eye"
             head.addChildNode(eye)
-            head.addChildNode(sphereNode(m.white, r: 0.012, at: V(0.2, 0.015, side * 0.07)))
+            head.addChildNode(sphereNode(m.white, r: 0.016, at: V(0.2, 0.035, side * 0.07)))
             head.addChildNode(sphereNode(cheek, r: 0.04, at: V(0.165, -0.07, side * 0.12), scale: V(0.5, 0.8, 1)))
         }
 
         // Big smile: a half-disc facing forward
-        let path = UIBezierPath(arcCenter: .zero, radius: 0.07, startAngle: 0, endAngle: .pi, clockwise: false)
+        let path = UIBezierPath(arcCenter: .zero, radius: 0.085, startAngle: 0, endAngle: .pi, clockwise: false)
         path.close()
-        let smile = SCNNode(geometry: SCNShape(path: path, extrusionDepth: 0.02))
+        path.flatness = 0.004
+        let smileShape = SCNShape(path: path, extrusionDepth: 0.02)
+        let smile = SCNNode(geometry: smileShape)
         smile.geometry?.materials = [mouth]
         smile.position = V(0.19, -0.065, 0)
         smile.eulerAngles = V(0, .pi / 2, 0)
@@ -65,12 +67,9 @@ enum Driver {
 
         // Bob along to the music, glance around, blink.
         head.runAction(.repeatForever(.sequence([
-            .rotateTo(x: 0, y: 0.35, z: 0.06, duration: 0.6, usesShortestUnitArc: true),
-            .wait(duration: 1.6),
-            .rotateTo(x: 0, y: -0.3, z: -0.06, duration: 0.6, usesShortestUnitArc: true),
-            .wait(duration: 1.2),
-            .rotateTo(x: 0, y: 0, z: 0, duration: 0.5, usesShortestUnitArc: true),
-            .wait(duration: 2.0),
+            .moveBy(x: 0, y: 0.03, z: 0, duration: 0.35),
+            .moveBy(x: 0, y: -0.03, z: 0, duration: 0.35),
+            .wait(duration: 0.4),
         ])))
         let blink = SCNAction.sequence([
             .wait(duration: 2.6, withRange: 2.0),
@@ -81,6 +80,16 @@ enum Driver {
         ])
         head.runAction(.repeatForever(blink))
         return root
+    }
+
+    /// Turn the driver's head toward the camera so the kid always gets a smile.
+    static func lookAt(_ driver: SCNNode, camera: SCNNode) {
+        guard let head = driver.childNode(withName: "head", recursively: false) else { return }
+        let look = SCNLookAtConstraint(target: camera)
+        look.localFront = V(1, 0, 0)
+        look.isGimbalLockEnabled = true
+        look.influenceFactor = 0.75
+        head.constraints = [look]
     }
 
     /// A happy little jump when something changes.

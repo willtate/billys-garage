@@ -75,8 +75,9 @@ final class GarageModel: ObservableObject {
     }
 
     func thumbnail(topper id: String) -> UIImage? {
-        let paint = design.paint
-        return thumb("topper|\(id)|\(paint)") { [thumbnailer] in thumbnailer.topper(id, paint: paint, size: Self.thumbSize) }
+        var d = design
+        d.topper = id
+        return thumb("topper|\(id)|\(d.body)|\(d.wheels)|\(d.paint)") { [thumbnailer] in thumbnailer.car(d, size: Self.thumbSize) }
     }
 
     private func thumb(_ key: String, render: @escaping () -> UIImage?) -> UIImage? {

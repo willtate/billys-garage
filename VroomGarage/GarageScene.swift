@@ -66,7 +66,7 @@ final class GarageScene {
         sun.shadowMapSize = CGSize(width: 2048, height: 2048)
         sun.shadowSampleCount = 16
         sun.shadowRadius = 6
-        sun.shadowColor = UIColor(white: 0, alpha: 0.38)
+        sun.shadowColor = UIColor(white: 0, alpha: 0.5)
         sun.orthographicScale = 7
         sun.shadowMode = .forward
         let sunNode = SCNNode()
@@ -144,8 +144,21 @@ final class GarageScene {
         let built = CarBuilder.build(design, materials: materials)
         car?.root.removeFromParentNode()
         carHolder.addChildNode(built.root)
+        Driver.lookAt(built.driver, camera: cameraNode)
         car = built
+        frameCar(built)
         return built
+    }
+
+    /// Pull the camera back for big cars, in for small ones.
+    private func frameCar(_ built: BuiltCar) {
+        guard let (lo, hi) = built.root.deepBounds() else { return }
+        let len = hi.x - lo.x, height = hi.y - lo.y
+        let target = min(max(max(len * 2.25, height * 4.2), minDistance), maxDistance)
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.6
+        cameraDistance = target
+        SCNTransaction.commit()
     }
 
     func isCar(_ node: SCNNode) -> Bool {
