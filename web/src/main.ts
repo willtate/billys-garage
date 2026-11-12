@@ -4,6 +4,7 @@ import { BuiltCar, buildCar, Design } from './car';
 import { makeReflectionRig, makeTurntable, makeWorkshop } from './garage';
 import { CarMaterials, paints } from './materials';
 import { wheels } from './wheels';
+import { autoUpdate } from './update';
 
 // MARK: Renderer and scene
 
@@ -102,8 +103,9 @@ let touching = false, resumeAt = 0;
 let fling: { from: number; by: number; t0: number } | null = null;
 let sway: { from: number; to: number; t0: number } | null = null;
 
-function beginTouch() { touching = true; fling = null; sway = null; }
-function endTouch() { touching = false; resumeAt = performance.now() + 4000; }
+let lastTouch = 0;
+function beginTouch() { touching = true; fling = null; sway = null; lastTouch = performance.now(); }
+function endTouch() { touching = false; lastTouch = performance.now(); resumeAt = performance.now() + 4000; }
 const dist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 
 view.addEventListener('pointerdown', (e) => {
@@ -227,6 +229,7 @@ function renderThumbs() {
   renderer.setPixelRatio(ratio);
 }
 
+autoUpdate(() => (touching ? performance.now() : lastTouch));
 renderThumbs();
 renderTabs();
 renderCards();
