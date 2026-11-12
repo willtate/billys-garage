@@ -8,11 +8,11 @@
 
 | Piece | Status | Last critic pick | Biggest gap named |
 |---|---|---|---|
-| Car look and charm (bodies, driver) | building | not judged yet | not judged yet |
-| Wheels | building | not judged yet | not judged yet |
-| Scene and world | building | not judged yet | not judged yet |
-| Part picker UI (for a 3-year-old) | building | not judged yet | not judged yet |
-| Feedback and juice (sound, motion) | building | not judged yet | not judged yet |
+| Round | Blind pick | Biggest gap named |
+|---|---|---|
+| 1 | Bar (Labo) | Cars look like crude programmer primitives with no driver; shown from behind |
+| 2 | Bar (Labo) | Still placeholder geometry: no arches or livery; tiny driver face; mid-lap shot looked broken |
+| 3 | **Ours** | (said of Labo) Abstract look-alike parts, no visible goal or GO payoff, washed-out world |
 
 ## Log
 
@@ -27,3 +27,18 @@
   - A road ring with red and white curbs, plus a toy town.
   - GO now drives a full lap of the road and spins home.
   - Bigger picker thumbnails.
+- **Round 3 build:**
+  - Fender arches over the wheels.
+  - Airfoil-shaped wings.
+  - Bobble-head drivers with bigger eyes and smiles, who turn to face the camera.
+  - Googly eyes moved to the hood.
+  - Topper cards show the whole car wearing the topper.
+  - Varied trees (round, pine, berry bush, poplar), petal flowers, chimneys and shop awnings.
+  - Smooth curves on every extruded shape.
+  - The camera frames each car to its size.
+- **Round 3 verdict: ours won blind.** The judge still called the bar "the more skilled illustration," but picked ours on toddler appeal, big clear choices, and the GO payoff. The loop's exit condition is met.
+
+## Known gaps worth another loop
+- Illustration craft: the bar's art is still more detailed (panel lines, spoked wire wheels, door handles).
+- Not yet judged: motion and sound. The judge only sees still screenshots.
+- Not yet hand-tested in the simulator: tapping, dragging, pinching, honk on tap.
