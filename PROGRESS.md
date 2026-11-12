@@ -13,6 +13,7 @@
 | 1 | Bar (Labo) | Cars look like crude programmer primitives with no driver; shown from behind |
 | 2 | Bar (Labo) | Still placeholder geometry: no arches or livery; tiny driver face; mid-lap shot looked broken |
 | 3 | **Ours** | (said of Labo) Abstract look-alike parts, no visible goal or GO payoff, washed-out world |
+| 4 | **Ours** (new judge, unseen Labo shots) | (said of Labo) Black-silhouette parts trays, text a toddler can't read, small driver |
 
 ## Log
 
@@ -38,7 +39,12 @@
   - The camera frames each car to its size.
 - **Round 3 verdict: ours won blind.** The judge still called the bar "the more skilled illustration," but picked ours on toddler appeal, big clear choices, and the GO payoff. The loop's exit condition is met.
 
+- **Round 4 build:**
+  - Door seams with chrome handles on the truck, jeep, and pickup.
+  - Hood and body racing stripes that flip to dark on light paints.
+  - A new wire-spoke wheel.
+- **Round 4 verdict: ours won blind again**, with a fresh judge and three Labo screenshots no judge had seen.
+
 ## Known gaps worth another loop
-- Illustration craft: the bar's art is still more detailed (panel lines, spoked wire wheels, door handles).
 - Not yet judged: motion and sound. The judge only sees still screenshots.
 - Not yet hand-tested in the simulator: tapping, dragging, pinching, honk on tap.
