@@ -66,3 +66,20 @@
 - Realism is still our weakest score (6 vs 7): flat panels and cartoon drivers next to die-cast detail. Next step would be curved body sides, recessed headlights with lenses, and a less cartoony driver.
 - Not yet judged: sound. Audio can't be heard from the simulator here; it needs a listen on a real iPad.
 - No app icon yet (blank placeholder on the home screen).
+
+## Round 6 — realism push (2026-11-12)
+- New `Loft`: bodies skinned from the side outline with superellipse sections (crowned hoods, bowed sides, rolled plan corners, wheel-arch haunches). Muscle, sports, pickup, off-road, monster and bus use it; formula keeps extrusions.
+- Stickers and door shut-lines wrap onto the curved skin (decal shells with side-projected UVs).
+- Cabins lean inward toward the roof (`tumblehome`), slimmer pillars, flush rounded roof, darker glass.
+- Headlamps: bucket, bright reflector, bulb, clear cover. Rect lamp clusters with twin projectors. Tail lamps: red lens over glowing core.
+- Driver: full-face helmet in paint colour with tinted visor (no cartoon face).
+- Soft contact shadow under every car. Front lip tucked under the nose.
+- 6b: matte tyres, lower-profile alloys, brake discs, red calipers fixed to the hub.
+- Tried SSAO: no visible effect without HDR, removed.
+
+Blind verdicts vs Hot Wheels Unlimited (realism / parts / garage / toddler):
+- 6 (ours = A): ours 5/8/9/8 vs bar 7/3/2/4. Winner: ours. Most fake: tyres (fixed in 6b).
+- 6b (ours = B): ours 4/8/7/8 vs bar 7/3/2/4. Winner: ours. Most fake: uniform candy-gloss paint with no reflections of the garage; car looks like it floats.
+- Realism score did not move (judges vary 4–6). Several judge suggestions were already present (shadow, lens/reflector, discs), so the details may not read at full-screen scale.
+
+Next realism ideas: paint that reflects the actual garage (cube map of the workshop), a much stronger contact/occlusion shadow, sidewall lettering, smaller blower.
