@@ -35,13 +35,29 @@ function sphere(m: THREE.Material, r: number, at: [number, number, number], scal
   return n;
 }
 
-/** The car's whole trip from the turntable and back, as a smooth curve in world space (ground level). */
-export function tripCurve(): THREE.CatmullRomCurve3 {
-  const pts: THREE.Vector3[] = [];
-  const v = (x: number, z: number) => new THREE.Vector3(x, 0, z);
-  pts.push(v(0, 0), v(DOOR_X * 0.5, WALL_Z * 0.5), v(DOOR_X, WALL_Z + 1.5), v(DOOR_X, WALL_Z - 3), v(DOOR_X, LANE_END + 1.5));
-  for (let i = 1; i < 24; i++) { const p = loopPoint(i / 24); pts.push(v(p.x, p.y)); }
-  pts.push(v(DOOR_X, LANE_END + 1.5), v(DOOR_X, WALL_Z - 3), v(DOOR_X, WALL_Z + 1.5), v(DOOR_X * 0.5, WALL_Z * 0.5), v(0, 0));
+const v3 = (x: number, z: number) => new THREE.Vector3(x, 0, z);
+/** Out of the garage: off the turntable, through the door and down the lane to where the road starts. */
+export function outCurve(): THREE.CatmullRomCurve3 {
+  return new THREE.CatmullRomCurve3([v3(0, 0), v3(DOOR_X * 0.5, WALL_Z * 0.5), v3(DOOR_X, WALL_Z + 1.5), v3(DOOR_X, WALL_Z - 3),
+    v3(DOOR_X, LANE_END + 1.5), v3(DOOR_X, LANE_END - 1.5)], false, 'centripetal', 0.5);
+}
+/** Home from wherever the car is: onto the road, round to the lane, up it and back onto the turntable. */
+export function homeCurve(x: number, z: number, yaw: number): THREE.CatmullRomCurve3 {
+  const pts = [v3(x, z), v3(x + Math.cos(yaw) * 3, z - Math.sin(yaw) * 3)];
+  const add = (p: THREE.Vector3) => { if (p.distanceTo(pts[pts.length - 1]) > 2.5) pts.push(p); };
+  const inLane = Math.abs(x - DOOR_X) < 3 && z > LANE_END - 1;
+  if (!inLane) {
+    const N = 48;
+    let j = 0;
+    for (let i = 1; i < N; i++) {
+      const a = loopPoint(i / N), b = loopPoint(j / N);
+      if (Math.hypot(a.x - x, a.y - z) < Math.hypot(b.x - x, b.y - z)) j = i;
+    }
+    // Round whichever way is shorter to the lane end (loop point 0 = N).
+    const dir = j > N / 2 ? 1 : -1;
+    for (let i = j + dir; dir > 0 ? i <= N : i >= 0; i += dir) { const p = loopPoint(i / N); add(v3(p.x, p.y)); }
+  }
+  for (const p of [v3(DOOR_X, LANE_END + 1.5), v3(DOOR_X, WALL_Z - 3), v3(DOOR_X, WALL_Z + 1.5), v3(DOOR_X * 0.5, WALL_Z * 0.5), v3(0, 0)]) add(p);
   return new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
 }
 
@@ -164,7 +180,14 @@ export interface Outside {
   root: THREE.Group;
   /** Call every frame while shown: ducks bob, sheep hop as the car goes by. */
   tick(now: number, car: THREE.Vector3): void;
+  /** Pushes a car of radius `r` at `p` (x, z in .x, .y) out of anything solid. True if it hit something. */
+  collide(p: THREE.Vector2, r: number): boolean;
+  /** True when (x, z) is in the duck pond. */
+  inPond(x: number, z: number): boolean;
 }
+
+/** Where the car may roam outside. */
+const BOUNDS = { minX: -40, maxX: 45, minZ: -66, maxZ: WALL_Z - 1.8 };
 
 export function makeOutside(onBaa: () => void): Outside {
   const root = new THREE.Group();
@@ -243,15 +266,22 @@ export function makeOutside(onBaa: () => void): Outside {
     [26, -26, 0xffe1a8, 0xd9412b, -0.6], [-22, -15, 0xbfe3ff, 0x3a5fcc, 0.4], [30, -42, 0xffc2d6, 0x8a3fb3, -1.2], [-26, -46, 0xd8f5c4, 0xd9412b, 0.9],
   ];
   for (const [x, z, w, rf, t] of houses) root.add(house(x, z, w, rf, t));
+  const solids: [number, number, number][] = houses.map(([x, z]) => [x, z, 2.6]);
   let placed = 0;
   for (let tries = 0; tries < 900 && placed < 70; tries++) {
     const x = -60 + r() * 120, z = WALL_Z - 3 - r() * 70;
     if (!clear(x, z, 4) || houses.some(([hx, hz]) => Math.hypot(hx - x, hz - z) < 5.5)) continue;
-    root.add(tree(treeMats, x, z, 0.8 + r() * 0.7, r() < 0.5));
+    const sc = 0.8 + r() * 0.7;
+    root.add(tree(treeMats, x, z, sc, r() < 0.5));
+    solids.push([x, z, sc]);
     placed++;
   }
   // A row of trees each side of the garage so it doesn't sit on its own.
-  for (let i = 0; i < 6; i++) for (const s of [-1, 1]) root.add(tree(treeMats, s * (19.5 + (i % 2) * 2.5), WALL_Z - 1.5 + i * 5, 1.2, i % 2 === 0));
+  for (let i = 0; i < 6; i++) for (const s of [-1, 1]) {
+    const x = s * (19.5 + (i % 2) * 2.5), z = WALL_Z - 1.5 + i * 5;
+    root.add(tree(treeMats, x, z, 1.2, i % 2 === 0));
+    solids.push([x, z, 1.2]);
+  }
 
   // Picket fence along the lane.
   const fence = pbr(0xffffff, 0.6);
@@ -261,24 +291,46 @@ export function makeOutside(onBaa: () => void): Outside {
     root.add(box(fence, 0.05, 0.1, Math.abs(LANE_END + 3 - (WALL_Z - 1.5)), 0, [fx, G + 0.5, (LANE_END + 3 + WALL_Z - 1.5) / 2]));
   }
 
+  const fences: [number, number, number][] = [-1, 1].map((s) => [DOOR_X + s * 2.6, LANE_END + 3, WALL_Z - 1.5]);
   const hoppers: Hopper[] = [];
   const animals = new Set<THREE.Object3D>();
   for (const [x, z, t] of [[-4.5, -31, 0.6], [-3.5, -37.5, 2.4], [-5, -34, -0.3], [13.5, -30, 1.2], [13, -38, 3.0], [27, -52, 1.6]]) {
     const s = sheep(x, z, t);
     root.add(s); animals.add(s);
     hoppers.push({ node: s, base: s.position.y, next: 0 });
+    solids.push([x, z, 0.75]);
   }
   const ducks: THREE.Object3D[] = [];
   for (const [x, z, t] of [[2.5, -32.5, 0.3], [7.5, -35, 2.5], [5.6, -31, 4]]) {
     const d = duck(x, z, t);
     root.add(d); animals.add(d); ducks.push(d);
+    solids.push([x, z, 0.4]);
   }
 
   mergeStatic(root, (o) => animals.has(o) || o === sky);
   root.visible = false;
 
+  const pondAt = (x: number, z: number) => Math.hypot((x - LOOP_C.x - 1) / (5 * 1.25), (z - LOOP_C.y) / (5 * 0.9));
   return {
     root,
+    inPond: (x, z) => pondAt(x, z) < 1,
+    collide(p, r) {
+      let hit = false;
+      const push = (cx: number, cz: number, rr: number) => {
+        const dx = p.x - cx, dy = p.y - cz, d = Math.hypot(dx, dy), min = rr + r;
+        if (d >= min) return;
+        hit = true;
+        if (d < 1e-4) { p.x += min; return; }
+        p.x = cx + (dx / d) * min; p.y = cz + (dy / d) * min;
+      };
+      // Trees count by their leaves, about as wide as the scale.
+      for (const [x, z, rr] of solids) push(x, z, rr);
+      // Lane fences: push off the nearest point of each.
+      for (const [fx, z0, z1] of fences) push(fx, Math.min(z1, Math.max(z0, p.y)), 0.1);
+      const cx = Math.min(BOUNDS.maxX, Math.max(BOUNDS.minX, p.x)), cz = Math.min(BOUNDS.maxZ, Math.max(BOUNDS.minZ, p.y));
+      if (cx !== p.x || cz !== p.y) { hit = true; p.set(cx, cz); }
+      return hit;
+    },
     tick(now, car) {
       ducks.forEach((d, i) => {
         d.position.y = G + 0.05 + 0.04 * Math.sin(now / 380 + i * 2);

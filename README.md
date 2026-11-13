@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Handy URL options: `?fps` shows frame rate and draw calls, and in dev `?washnow&at=2000` (or `?gonow`, `?drivenow`, `?mudnow=3`) fast-forwards an animation for screenshots.
+Handy URL options: `?fps` shows frame rate and draw calls, and in dev `?washnow&at=2000` (or `?gonow`, `?drivenow`, `?mudnow=3`) fast-forwards an animation for screenshots. Out driving, `?steer=0.2,0.4` holds a pretend finger at that spot on screen and `?homeat=10000` presses the home button then.
 
 ## iPad (native)
 

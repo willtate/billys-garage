@@ -3,8 +3,8 @@ import { bodies, emergency } from './bodies';
 import { BuiltCar, buildCar, Design, slots } from './car';
 import { addons } from './addons';
 import { stickers } from './stickers';
-import { DOOR_X, makeDoor, makeReflectionRig, makeTurntable, makeWorkshop, WALL_Z } from './garage';
-import { groundHeight, makeOutside, tripCurve } from './outside';
+import { DOOR_X, FLOOR_Y, makeDoor, makeReflectionRig, makeTurntable, makeWorkshop, WALL_Z } from './garage';
+import { groundHeight, homeCurve, makeOutside, outCurve } from './outside';
 import { CarMaterials, paints } from './materials';
 import { wheels } from './wheels';
 import { autoUpdate } from './update';
@@ -332,14 +332,67 @@ function vroom() {
 }
 
 // MARK: Out for a drive — tap the garage door: it rolls up, the turntable turns the car to face
-// it, and the car drives out, round the pond and over the hill, then back home.
+// it, and the car drives out down the lane. Then Billy drives: hold a finger down and the car
+// heads for it. The 🏠 button (or driving back to the door) brings it home.
 
 let outing = false;
+/** Set while Billy is at the wheel. */
+let free: { speed: number; yaw: number } | null = null;
+let motor: ReturnType<typeof loop> | null = null;
+let odo = 0, sirenAt = 0, bumpAt = 0, splashAt = 0;
+/** The finger steering the car, in screen pixels. */
+let steer: { id: number; x: number; y: number } | null = null;
+// Chase camera: its heading lags the car's a little; camK blends from the garage view (0) to it (1).
+let camYaw = 0, camK = 0, rest = 10;
+const restPos = new THREE.Vector3(), restLook = new THREE.Vector3(0, 0.55, 0);
+const TOP = 9;
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/** Put the car at ground (x, z) facing `yaw`, tilted with the slope (and sunk a little in the pond). */
+function placeCar(x: number, z: number, yaw: number) {
+  const cx = Math.cos(yaw), cz = -Math.sin(yaw);
+  const h = (d: number) => groundHeight(x + cx * d, z + cz * d);
+  const off = -0.25 * smooth((Math.hypot(x, z) - 3.4) / 0.5); // off the raised turntable onto the floor
+  const wet = outside.inPond(x, z) ? -0.28 : 0;
+  carHolder.position.set(x, off + groundHeight(x, z) + wet, z);
+  carHolder.rotation.set(0, yaw, Math.atan2(h(0.8) - h(-0.8), 1.6));
+}
+
+function rolled(by: number, speed: number) {
+  odo += by;
+  if (car) for (const sp of car.spinners) sp.rotation.z = sp.userData.dir * odo / 0.5;
+  motor?.rate(0.55 + 0.6 * Math.min(1, Math.abs(speed) / TOP));
+  if (emergency.has(design.body) && odo - sirenAt > 30) { sirenAt = odo; play('siren'); }
+}
+
+/** Drive along `curve`, from speed v0 to v1, calling `each(s, L)` every step. */
+function ride(curve: THREE.Curve<THREE.Vector3>, v0: number, v1: number, each: (s: number, L: number) => void, done: () => void) {
+  const L = curve.getLength();
+  const speed = (d: number) => Math.min(v0 + (TOP - v0) * smooth(d / 7), v1 + (TOP - v1) * smooth((L - d) / 7));
+  const route: number[] = [0];
+  for (let d = 0; d < L; ) { d = Math.min(L, d + speed(d) * 0.01); route.push(d); }
+  const along = (u: number) => {
+    const f = u * (route.length - 1), i = Math.min(route.length - 2, Math.floor(f));
+    return route[i] + (route[i + 1] - route[i]) * (f - i);
+  };
+  const p = new THREE.Vector3(), tan = new THREE.Vector3();
+  let last = 0;
+  animate(0, (route.length - 1) * 10, (u) => {
+    const s = along(u);
+    curve.getPointAt(s / L, p);
+    curve.getTangentAt(s / L, tan);
+    placeCar(p.x, p.z, Math.atan2(-tan.z, tan.x));
+    rolled(s - last, speed(s));
+    last = s;
+    each(s, L);
+  }, done);
+}
+
 function drive() {
   if (driving || washing || !car) return;
   driving = outing = true;
   document.body.classList.add('outing');
-  const c = car;
+  document.body.classList.remove('steered');
   play('door');
   if (emergency.has(design.body)) play('siren');
   outside.root.visible = true;
@@ -348,95 +401,131 @@ function drive() {
   // Turn the turntable so the car faces the door.
   const want = Math.atan2(-WALL_Z, DOOR_X) - autoSpin.rotation.y; // car's +X towards the door
   const from = userSpin.rotation.y;
-  const turn = Math.atan2(Math.sin(want - from), Math.cos(want - from));
+  const turn = wrap(want - from);
   animate(0, 800, (u) => { userSpin.rotation.y = from + turn * smooth(u); });
 
-  const curve = tripCurve(), L = curve.getLength();
-  const motor = loop('motor');
+  motor = loop('motor');
   motor.rate(0.6);
   animate(700, 300, () => {}, exhaust);
 
-  // Distance over time: pull away, cruise, ease into the turntable at the end.
-  const top = 9;
-  const speed = (d: number) => top * (0.12 + 0.88 * smooth(d / 7) * smooth((L - d) / 7));
-  const route: number[] = [0];
-  for (let d = 0; d < L; ) { d = Math.min(L, d + speed(d) * 0.01); route.push(d); }
-  const ms = (route.length - 1) * 10;
-  const along = (u: number) => {
-    const f = u * (route.length - 1), i = Math.min(route.length - 2, Math.floor(f));
-    return route[i] + (route[i + 1] - route[i]) * (f - i);
-  };
-
-  // Camera: from the usual spot to chasing behind the car, and back again at the end.
-  const restPos = camera.getWorldPosition(new THREE.Vector3()), restLook = new THREE.Vector3(0, 0.55, 0);
-  const rest = cameraDistance;
   // Take the rig out of the way so the camera can be placed in world space.
+  rest = cameraDistance;
+  camera.getWorldPosition(restPos);
   cameraRig.position.set(0, 0, 0);
   cameraRig.rotation.set(0, 0, 0);
   camera.position.copy(restPos);
   camera.lookAt(restLook);
-  const chasePos = new THREE.Vector3(), chaseLook = new THREE.Vector3();
-  const p = new THREE.Vector3(), tan = new THREE.Vector3(), ahead = new THREE.Vector3();
-  let doorShut = false, sirenAt = 0;
+  camK = 0;
+  odo = sirenAt = 0;
 
   animate(900, 1, () => {
     // Lift the car off the turntable into the world, keeping where it is.
     scene.attach(carHolder);
     carHolder.rotation.order = 'YXZ';
+    camYaw = carHolder.rotation.y;
+    ride(outCurve(), 1.1, 5, (s) => { camK = smooth((s - 2) / 9); }, () => {
+      free = { speed: 5, yaw: carHolder.rotation.y };
+      document.body.classList.add('free');
+    });
   });
-  animate(900, ms, (u) => {
-    const s = along(u), t = s / L;
-    curve.getPointAt(t, p);
-    curve.getTangentAt(t, tan);
-    const r = Math.hypot(p.x, p.z);
-    const y = -0.25 * smooth((r - 3.4) / 0.5) + groundHeight(p.x, p.z);
-    // Pitch from the slope just ahead and behind.
-    const h = (d: number) => { curve.getPointAt(Math.min(1, Math.max(0, (s + d) / L)), ahead); return groundHeight(ahead.x, ahead.z); };
-    const pitch = Math.atan2(h(0.8) - h(-0.8), 1.6);
-    const yaw = Math.atan2(-tan.z, tan.x);
-    carHolder.position.set(p.x, y, p.z);
-    carHolder.rotation.set(0, yaw, pitch);
-    for (const sp of c.spinners) sp.rotation.z = sp.userData.dir * s / 0.5;
-    motor.rate(0.55 + 0.6 * (speed(s) / top));
-    if (emergency.has(design.body) && s - sirenAt > 30) { sirenAt = s; play('siren'); }
+}
 
-    // Chase camera: behind and above, looking a little ahead.
-    const back = Math.atan2(tan.z, tan.x);
-    chasePos.set(p.x - Math.cos(back) * 9, y + 4.4, p.z - Math.sin(back) * 9);
-    chaseLook.set(p.x + Math.cos(back) * 4, y + 0.3, p.z + Math.sin(back) * 4);
-    const k = smooth((s - 2) / 9) * (1 - smooth((s - (L - 17)) / 10));
-    camera.position.lerpVectors(restPos, chasePos, k);
-    ahead.lerpVectors(restLook, chaseLook, k);
-    camera.lookAt(ahead);
+/** Billy's turn: each frame, head for the finger (if there is one), bumping off trees and fences. */
+const aim = new THREE.Vector3(), nextPos = new THREE.Vector2();
+function freeStep(dt: number, now: number) {
+  const f = free!, P = carHolder.position;
+  let want = 0, turn = 0;
+  if (steer) {
+    ray.setFromCamera(new THREE.Vector2((steer.x / innerWidth) * 2 - 1, -(steer.y / innerHeight) * 2 + 1), camera);
+    const o = ray.ray.origin, d = ray.ray.direction;
+    // Where the finger points on the ground; if it's up in the sky, far off that way.
+    const k = d.y < -0.03 ? (o.y - P.y) / -d.y : 200;
+    aim.copy(o).addScaledVector(d, k);
+    const dx = aim.x - P.x, dz = aim.z - P.z, dist = Math.hypot(dx, dz);
+    const diff = wrap(Math.atan2(-dz, dx) - f.yaw);
+    turn = Math.max(-1, Math.min(1, diff * 2));
+    // Slow for tight turns and when the finger is right by the car.
+    want = TOP * Math.min(1, Math.max(0, (dist - 1.5) / 5)) * (Math.abs(diff) > 1.8 ? 0.55 : 1);
+  }
+  const wet = outside.inPond(P.x, P.z);
+  if (wet) want = Math.min(want, 3.5);
+  f.speed += Math.max(-7 * dt, Math.min(5 * dt, want - f.speed));
+  f.yaw += turn * 2.3 * dt * Math.min(1, 0.35 + Math.abs(f.speed) / 4);
 
+  const step = f.speed * dt;
+  nextPos.set(P.x + Math.cos(f.yaw) * step, P.z - Math.sin(f.yaw) * step);
+  if (outside.collide(nextPos, 1.1)) {
+    if (Math.abs(f.speed) > 2.5 && now - bumpAt > 600) { bumpAt = now; play('boing'); f.speed = -0.3 * f.speed; squash(); }
+    else f.speed *= 0.5;
+  }
+  const moved = Math.hypot(nextPos.x - P.x, nextPos.y - P.z) * Math.sign(f.speed);
+  placeCar(nextPos.x, nextPos.y, f.yaw);
+  rolled(moved, f.speed);
+
+  if (wet && Math.abs(f.speed) > 1 && now - splashAt > 260) {
+    splashAt = now;
+    if (Math.random() < 0.5) play('splat');
+    burst(scene, { at: carHolder.position.clone().setY(FLOOR_Y + 0.1), count: 16, color: new THREE.Color(0x8fd3ff), speed: 3, spread: 0.5,
+      dir: new THREE.Vector3(0, 1, 0), radius: 1, size: 0.25, life: 700, gravity: 9 });
+  }
+  // Drove back to the garage door: home time.
+  if (Math.abs(P.x - DOOR_X) < 2.4 && P.z > WALL_Z - 3) goHome();
+}
+
+function goHome() {
+  if (!free) return;
+  const f = free;
+  free = null;
+  steer = null;
+  document.body.classList.remove('free');
+  let doorShut = false;
+  ride(homeCurve(carHolder.position.x, carHolder.position.z, f.yaw), Math.max(1.1, f.speed), 1.1, (s, L) => {
+    camK = 1 - smooth((s - (L - 17)) / 10);
     if (!doorShut && s > L - 9) {
       doorShut = true;
       play('door');
       animate(0, 1000, (u2) => door.open(1 - smooth(u2)), () => { outside.root.visible = false; });
     }
-  }, () => {
-    motor.stop();
-    // Back on the turntable: hand the car back to it, then spin round to the usual pose.
-    const yaw = carHolder.rotation.y;
-    carHolder.rotation.set(0, 0, 0);
-    carHolder.rotation.order = 'XYZ';
-    carHolder.position.set(0, 0, 0);
-    userSpin.add(carHolder);
-    carHolder.rotation.set(0, 0, 0);
-    userSpin.rotation.y = yaw - autoSpin.rotation.y;
-    // Put the camera back in its rig.
-    cameraRig.position.set(0, 0.55, 0);
-    cameraRig.rotation.set(-0.2, 0, 0);
-    camera.position.set(0, 0, rest);
-    camera.quaternion.identity();
-    const y0 = userSpin.rotation.y, to = -0.7 + Math.round((y0 + 0.7) / (2 * Math.PI)) * 2 * Math.PI;
-    animate(0, 900, (u) => { userSpin.rotation.y = y0 + (to - y0) * smooth(u); }, () => {
-      driving = outing = false;
-      document.body.classList.remove('outing');
-      hop();
-      cheer(c.driver);
-    });
+  }, parkHome);
+}
+
+function parkHome() {
+  motor?.stop();
+  motor = null;
+  // Back on the turntable: hand the car back to it, then spin round to the usual pose.
+  const yaw = carHolder.rotation.y;
+  carHolder.rotation.set(0, 0, 0);
+  carHolder.rotation.order = 'XYZ';
+  carHolder.position.set(0, 0, 0);
+  userSpin.add(carHolder);
+  userSpin.rotation.y = yaw - autoSpin.rotation.y;
+  // Put the camera back in its rig.
+  cameraRig.position.set(0, 0.55, 0);
+  cameraRig.rotation.set(-0.2, 0, 0);
+  camera.position.set(0, 0, rest);
+  camera.quaternion.identity();
+  const y0 = userSpin.rotation.y, to = -0.7 + Math.round((y0 + 0.7) / (2 * Math.PI)) * 2 * Math.PI;
+  animate(0, 900, (u) => { userSpin.rotation.y = y0 + (to - y0) * smooth(u); }, () => {
+    driving = outing = false;
+    camK = 0;
+    document.body.classList.remove('outing');
+    hop();
+    if (car) cheer(car.driver);
   });
+}
+
+/** Every frame while out: Billy's driving, then the chase camera. */
+const chasePos = new THREE.Vector3(), chaseLook = new THREE.Vector3(), lookAt = new THREE.Vector3();
+function outingFrame(dt: number, now: number) {
+  if (free) freeStep(dt, now);
+  if (camK <= 0) return;
+  camYaw += wrap(carHolder.rotation.y - camYaw) * Math.min(1, dt * 2.5);
+  const P = carHolder.position, fx = Math.cos(camYaw), fz = -Math.sin(camYaw);
+  chasePos.set(P.x - fx * 9, P.y + 4.4, P.z - fz * 9);
+  chaseLook.set(P.x + fx * 4, P.y + 0.3, P.z + fz * 4);
+  camera.position.lerpVectors(restPos, chasePos, camK);
+  lookAt.lerpVectors(restLook, chaseLook, camK);
+  camera.lookAt(lookAt);
 }
 
 materials.setPaint(paints.find((p) => p.id === design.paint) ?? paints[7], false);
@@ -464,7 +553,14 @@ const dist = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.
 let downAt = { x: 0, y: 0, t: 0 };
 window.addEventListener('pointerdown', unlock, { capture: true });
 view.addEventListener('pointerdown', (e) => {
-  view.setPointerCapture(e.pointerId);
+  try { view.setPointerCapture(e.pointerId); } catch { /* not a live pointer (a test) */ }
+  if (outing) {
+    // Out driving: the finger steers (once Billy has the wheel); a quick tap on the car still honks.
+    downAt = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+    if (!steer) steer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    document.body.classList.add('steered');
+    return;
+  }
   downAt = { x: e.clientX, y: e.clientY, t: e.timeStamp };
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   beginTouch();
@@ -472,6 +568,7 @@ view.addEventListener('pointerdown', (e) => {
   if (pointers.size === 2) { pinchStart = cameraDistance; pinchD = dist(); }
 });
 view.addEventListener('pointermove', (e) => {
+  if (steer && steer.id === e.pointerId) { steer.x = e.clientX; steer.y = e.clientY; }
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size === 1) {
@@ -484,6 +581,10 @@ view.addEventListener('pointermove', (e) => {
   }
 });
 const up = (e: PointerEvent) => {
+  if (steer && steer.id === e.pointerId) {
+    steer = null;
+    if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 12 && e.timeStamp - downAt.t < 350) tapped(e);
+  }
   if (!pointers.delete(e.pointerId)) return;
   if (pointers.size === 0) {
     if (Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 12 && e.timeStamp - downAt.t < 350) tapped(e);
@@ -508,6 +609,7 @@ document.getElementById('go')!.addEventListener('pointerdown', () => vroom());
 document.getElementById('horn')!.addEventListener('pointerdown', () => honk());
 document.getElementById('wash')!.addEventListener('pointerdown', () => wash());
 document.getElementById('mud')!.addEventListener('pointerdown', () => muddy());
+document.getElementById('home')!.addEventListener('pointerdown', () => { play('pop'); goHome(); });
 view.addEventListener('pointercancel', up);
 view.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -681,6 +783,11 @@ if (q.has('icon')) {
 if (q.has('go')) setTimeout(vroom, Number(q.get('go')) || 500);
 if (q.has('wash')) setTimeout(wash, Number(q.get('wash')) || 500);
 if (q.has('drive')) setTimeout(drive, Number(q.get('drive')) || 500);
+// `?steer=x,y` holds a pretend finger at that spot (fractions of the screen) while out driving.
+if (q.has('steer')) {
+  const [fx, fy] = q.get('steer')!.split(',').map(Number);
+  steer = { id: -1, x: fx * innerWidth, y: fy * innerHeight };
+}
 renderCards();
 
 // MARK: Frame loop
@@ -709,7 +816,8 @@ const carPos = new THREE.Vector3();
 function drawFrame(now: number) {
   const busy = tickAnims(now) || driving || touching || !!fling;
   if (now - lastDraw < (busy ? 15.5 : 31)) return;
-  tickBursts(now, Math.min(0.05, (now - lastDraw) / 1000));
+  const dt = Math.min(0.05, (now - lastDraw) / 1000);
+  tickBursts(now, dt);
   lastDraw = now;
   materials.tick(now);
   if (fpsEl && ++frames && now - fpsT > 1000) { fpsEl.textContent = `${Math.round((frames * 1000) / (now - fpsT))} fps · ${renderer.info.render.calls} calls · ${Math.round(renderer.info.render.triangles / 1000)}k tris`; frames = 0; fpsT = now; }
@@ -730,6 +838,7 @@ function drawFrame(now: number) {
     autoSpin.rotation.y = sway.from + (sway.to - sway.from) * ease(Math.min(1, t));
   }
 
+  if (outing) outingFrame(Math.min(dt, 0.0334), now);
   door.tick(now);
   if (outside.root.visible) outside.tick(now, carHolder.getWorldPosition(carPos));
   if (car) {
@@ -751,7 +860,8 @@ if (import.meta.env.DEV && q.has('at')) {
     if (q.has('washnow')) wash();
     if (q.has('gonow')) vroom();
     if (q.has('drivenow')) drive();
-    for (let t = t0; t <= t0 + until; t += 16.7) { lastDraw = -1e9; drawFrame(t); }
+    if (q.has('homeat')) animate(Number(q.get('homeat')), 1, goHome);
+    for (let t = t0; t <= t0 + until; t += 16.7) { lastDraw = t - 16.7; drawFrame(t); }
     renderer.setAnimationLoop(() => renderer.render(scene, camera)); // keep presenting the frozen frame
   }
 } else {

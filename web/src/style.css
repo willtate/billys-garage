@@ -45,3 +45,13 @@ body.washing #tray { opacity: 0.45; transition: opacity 0.3s; }
 #tray, #go, #wash, #mud { transition: transform 0.5s, opacity 0.3s; }
 body.outing #tray { transform: translateY(150%); }
 body.outing #go, body.outing #wash, body.outing #mud { transform: translateX(160px); }
+/* Billy driving: a big home button where GO was, and a bobbing finger until he first touches. */
+#home { position: fixed; top: calc(18px + env(safe-area-inset-top)); right: 22px; width: 112px; height: 112px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 56px; background: #ff7a1a; transform: translateX(170px); transition: transform 0.5s;
+  box-shadow: 0 7px 14px rgba(0,0,0,0.45), inset 0 -8px 12px rgba(0,0,0,0.22), inset 0 6px 10px rgba(255,255,255,0.4); }
+body.free #home { transform: none; }
+#home:active { transform: scale(0.92); }
+#hint { position: fixed; left: 50%; top: 30%; font-size: 96px; margin-left: -48px; pointer-events: none; opacity: 0; transition: opacity 0.4s;
+  filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4)); }
+body.free:not(.steered) #hint { opacity: 1; animation: poke 1.1s ease-in-out infinite; }
+@keyframes poke { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(26px) scale(0.88); } }
