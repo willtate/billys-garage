@@ -5,6 +5,8 @@ import { defineConfig } from 'vite';
 const buildId = new Date().toISOString();
 
 export default defineConfig({
+  // Older iPads (an iPad mini 4 tops out at iOS 15) can't parse newer syntax like class static blocks.
+  build: { target: ['es2020', 'safari15'] },
   define: { __BUILD_ID__: JSON.stringify(buildId) },
   plugins: [{
     name: 'version-file',

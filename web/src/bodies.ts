@@ -620,7 +620,13 @@ export const police: BodyStyle = {
         c.translate(0, H); c.scale(scale, -scale); c.translate(-b.minX, -b.minY);
         tracePath(c, loft.outline); c.clip();
         c.fillStyle = '#f7f7f7';
-        c.beginPath(); c.roundRect(-1.42, 0.44, 2.22, 0.56, 0.06); c.fill();
+        c.beginPath();
+        { // a rounded box (canvas roundRect needs iOS 16)
+          const x = -1.42, y = 0.44, w = 2.22, h = 0.56, r = 0.06;
+          c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+          c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+        }
+        c.fill();
         if (!mirror) { c.save(); c.translate(0.2, 0.7); c.scale(1, -1); star(c, 0, 0, 0.13); c.restore(); }
         else { c.save(); c.translate(0.2, 0.7); c.scale(-1, -1); star(c, 0, 0, 0.13); c.restore(); }
         c.fillStyle = '#e8b21c'; c.fill();
