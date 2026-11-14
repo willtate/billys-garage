@@ -47,9 +47,11 @@ body.outing #tray { transform: translateY(150%); }
 body.outing #go, body.outing #wash, body.outing #mud { transform: translateX(160px); }
 /* Billy driving: a big home button where GO was, and a bobbing finger until he first touches. */
 #home { position: fixed; top: calc(18px + env(safe-area-inset-top)); right: 22px; width: 112px; height: 112px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 56px; background: #ff7a1a; transform: translateX(170px); transition: transform 0.5s;
+  display: grid; place-items: center; font-size: 56px; background: #ff7a1a; transform: translateX(170px);
+  /* Fully hidden when not in use: older iOS Safari can hit-test a moved-away fixed element at its old spot, over GO. */
+  visibility: hidden; pointer-events: none; transition: transform 0.5s, visibility 0s 0.5s;
   box-shadow: 0 7px 14px rgba(0,0,0,0.45), inset 0 -8px 12px rgba(0,0,0,0.22), inset 0 6px 10px rgba(255,255,255,0.4); }
-body.free #home { transform: none; }
+body.free #home { transform: none; visibility: visible; pointer-events: auto; transition: transform 0.5s, visibility 0s; }
 #home:active { transform: scale(0.92); }
 #hint { position: fixed; left: 50%; top: 30%; font-size: 96px; margin-left: -48px; pointer-events: none; opacity: 0; transition: opacity 0.4s;
   filter: drop-shadow(0 6px 8px rgba(0,0,0,0.4)); }
